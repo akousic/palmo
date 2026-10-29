@@ -1,0 +1,117 @@
+import AppKit
+import PalmoCore
+import SwiftUI
+
+/// Observable state rendered by the overlay.
+@MainActor
+@Observable
+final class OverlayState {
+    var status = EngineStatus()
+}
+
+/// A small click-through, non-activating panel in the bottom-right corner showing armed state and the hand.
+@MainActor
+final class OverlayController {
+    weak var model: AppModel?
+    private let state = OverlayState()
+    private var panel: NSPanel?
+
+    /// Shows or hides the overlay.
+    func setVisible(_ visible: Bool) {
+        if visible {
+            if panel == nil { panel = makePanel() }
+            position()
+            panel?.orderFrontRegardless()
+        } else {
+            panel?.orderOut(nil)
+        }
+    }
+
+    /// Pushes a new status snapshot.
+    func update(_ status: EngineStatus) {
+        guard panel?.isVisible == true else { return }
+        state.status = status
+    }
+
+    private func makePanel() -> NSPanel {
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 220, height: 150),
+                            styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: true)
+        panel.isFloatingPanel = true
+        panel.level = .statusBar
+        panel.ignoresMouseEvents = true
+        panel.hasShadow = false
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        panel.contentView = NSHostingView(rootView: OverlayView(state: state))
+        return panel
+    }
+
+    private func position() {
+        guard let panel, let screen = NSScreen.main?.visibleFrame else { return }
+        panel.setFrameOrigin(NSPoint(x: screen.maxX - panel.frame.width - 16, y: screen.minY + 16))
+    }
+}
+
+/// Overlay content: status pill and a live hand skeleton.
+struct OverlayView: View {
+    let state: OverlayState
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            HandSkeleton(pose: state.status.pose, armed: state.status.isArmed)
+                .frame(width: 110, height: 90)
+            HStack(spacing: 6) {
+                Circle().fill(state.status.isArmed ? Color.green : Color.gray).frame(width: 8, height: 8)
+                Text(caption).font(.caption.weight(.medium)).lineLimit(1)
+            }
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(.regularMaterial, in: .capsule)
+        }
+        .frame(width: 220, height: 150, alignment: .bottomTrailing)
+    }
+
+    private var caption: String {
+        if let outcome = state.status.lastOutcome, state.status.isArmed { return OutcomeText.describe(outcome) }
+        return state.status.isArmed ? "Armed" : (state.status.handVisible ? "Hold ✋ to arm" : "Palmo")
+    }
+}
+
+/// Draws the 21 tracked joints and bones.
+struct HandSkeleton: View {
+    let pose: HandPose?
+    let armed: Bool
+
+    private static let chains: [[Joint]] = Finger.allCases.map { finger in
+        [.wrist, finger.mcp, finger.pip, finger.dip, finger.tip]
+    }
+
+    var body: some View {
+        Canvas { context, size in
+            guard let pose else { return }
+            let xs = pose.landmarks.map(\.location.x), ys = pose.landmarks.map(\.location.y)
+            guard let minX = xs.min(), let maxX = xs.max(), let minY = ys.min(), let maxY = ys.max() else { return }
+            let span = max(maxX - minX, maxY - minY, 0.001)
+            func point(_ joint: Joint) -> CGPoint {
+                let p: Point2D = pose[joint]
+                let scale: Double = (size.height - 8) / span
+                let x: Double = (p.x - minX) * scale + 4
+                let y: Double = size.height - ((p.y - minY) * scale + 4)
+                return CGPoint(x: x, y: y)
+            }
+            let color: Color = armed ? .green : .white
+            for chain in Self.chains {
+                var path = Path()
+                path.move(to: point(chain[0]))
+                for joint in chain.dropFirst() { path.addLine(to: point(joint)) }
+                context.stroke(path, with: .color(color.opacity(0.85)), lineWidth: 2)
+            }
+            for joint in Joint.allCases {
+                let p = point(joint)
+                context.fill(Path(ellipseIn: CGRect(x: p.x - 2, y: p.y - 2, width: 4, height: 4)), with: .color(color))
+            }
+        }
+        .background(.black.opacity(0.35), in: .rect(cornerRadius: 10))
+        .opacity(pose == nil ? 0 : 1)
+    }
+}
