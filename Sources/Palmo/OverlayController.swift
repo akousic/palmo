@@ -34,7 +34,7 @@ final class OverlayController {
     }
 
     private func makePanel() -> NSPanel {
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 220, height: 150),
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 260),
                             styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: true)
         panel.isFloatingPanel = true
         panel.level = .statusBar
@@ -59,6 +59,9 @@ struct OverlayView: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 6) {
+            if state.status.airWriting.isActive {
+                AirInkView(air: state.status.airWriting)
+            }
             HandSkeleton(pose: state.status.pose, armed: state.status.isArmed)
                 .frame(width: 110, height: 90)
             HStack(spacing: 6) {
@@ -79,10 +82,16 @@ struct OverlayView: View {
             .padding(.horizontal, 10).padding(.vertical, 5)
             .background(.regularMaterial, in: .capsule)
         }
-        .frame(width: 220, height: 150, alignment: .bottomTrailing)
+        .frame(width: 380, height: 260, alignment: .bottomTrailing)
     }
 
     private var caption: String {
+        let air = state.status.airWriting
+        if air.isActive {
+            if air.pendingWords > 0 { return "Reading…" }
+            return air.penDown ? "Writing" : "Air writing · pinch to write"
+        }
+        if air.templeProgress > 0 { return "Hold at temple to write…" }
         if let outcome = state.status.lastOutcome, state.status.isArmed { return OutcomeText.describe(outcome) }
         if state.status.isArmed { return "Armed" }
         if state.status.armProgress > 0 { return "Arming… keep holding ✋" }
@@ -127,5 +136,38 @@ struct HandSkeleton: View {
         }
         .background(.black.opacity(0.35), in: .rect(cornerRadius: 10))
         .opacity(pose == nil ? 0 : 1)
+    }
+}
+
+
+/// Air-writing ink: the word being written, the pen, and the recognized preview.
+struct AirInkView: View {
+    let air: AirWritingStatus
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Canvas { context, size in
+                // Camera space (0...1, y up) mapped onto the canvas so the ink follows the hand.
+                func map(_ p: Point2D) -> CGPoint { CGPoint(x: p.x * size.width, y: (1 - p.y) * size.height) }
+                var path = Path()
+                for stroke in air.ink where !stroke.isEmpty {
+                    path.move(to: map(stroke[0]))
+                    if stroke.count == 1 { path.addLine(to: map(stroke[0]).applying(.init(translationX: 1, y: 0))) }
+                    for p in stroke.dropFirst() { path.addLine(to: map(p)) }
+                }
+                context.stroke(path, with: .color(.white), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                if let pen = air.penPoint {
+                    let c = map(pen)
+                    context.fill(Path(ellipseIn: CGRect(x: c.x - 5, y: c.y - 5, width: 10, height: 10)),
+                                 with: .color(air.penDown ? .green : .gray))
+                }
+            }
+            .frame(width: 360, height: 150)
+            .background(Color.black.opacity(0.55), in: .rect(cornerRadius: 12))
+            Text(air.preview.isEmpty ? "Pinch to write · 👍 type · ✌️ delete · ✊ cancel" : "“\(air.preview)”  👍 to type")
+                .font(.callout.weight(.medium)).lineLimit(1)
+                .padding(.horizontal, 10).padding(.vertical, 4)
+                .background(.regularMaterial, in: .capsule)
+        }
     }
 }

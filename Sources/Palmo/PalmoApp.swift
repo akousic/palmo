@@ -12,7 +12,7 @@ struct PalmoApp: App {
         MenuBarExtra {
             MenuContentView(model: model)
         } label: {
-            Image(systemName: model.status.isArmed ? "hand.raised.fill"
+            Image(systemName: model.status.airWriting.isActive ? "pencil.and.scribble" : model.status.isArmed ? "hand.raised.fill"
                   : (model.status.armProgress > 0 ? "hand.raised.circle.fill" : (model.isRunning ? "hand.raised" : "hand.raised.slash")))
                 .accessibilityLabel(model.status.isArmed ? "Palmo armed" : "Palmo")
         }
@@ -32,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ArmHotKey.shared.register {
                 let model = AppModel.shared
                 Task { await model.setArmed(!model.status.isArmed) }
+            }
+            ArmHotKey.shared.registerAirWriting {
+                let model = AppModel.shared
+                Task { await model.setAirWriting(!model.status.airWriting.isActive) }
             }
         }
     }

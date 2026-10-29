@@ -16,7 +16,7 @@ final class AppModel {
             SettingsStore.save(settings)
             let snapshot = settings
             Task { await engine.update(settings: snapshot) }
-            overlay.setVisible(snapshot.showOverlay && isRunning)
+            overlay.setVisible(overlayWanted)
             if snapshot.pauseOnLowPower != oldValue.pauseOnLowPower { reevaluatePower() }
         }
     }
@@ -68,12 +68,15 @@ final class AppModel {
         let capture = self.capture
         engine = GestureEngine(settings: loaded, router: router, frontmost: frontmost,
                                keyboard: KeyboardActivity(log: log),
-                               setFrameRate: { fps in capture.setTargetFrameRate(fps) })
+                               setFrameRate: { fps in capture.setTargetFrameRate(fps) },
+                               setFaceLandmarks: { on in capture.setFaceLandmarks(on) })
         power.onChange = { [weak self] in self?.reevaluatePower() }
         statusTask = Task { [weak self, engine] in
             for await snapshot in engine.status {
                 guard let self else { return }
+                let airChanged = snapshot.airWriting.isActive != self.status.airWriting.isActive
                 self.status = snapshot
+                if airChanged { self.overlay.setVisible(self.overlayWanted) }
                 self.overlay.update(snapshot)
             }
         }
@@ -116,6 +119,19 @@ final class AppModel {
         await engine.setArmed(armed)
     }
 
+    /// The overlay shows when enabled, and always while air writing (the ink is drawn there).
+    var overlayWanted: Bool { isRunning && (settings.showOverlay || status.airWriting.isActive) }
+
+    /// Turns air writing on or off.
+    func setAirWriting(_ on: Bool) async {
+        await engine.setAirWriting(on)
+    }
+
+    /// Types the air-writing preview now.
+    func insertAirText() async {
+        await engine.insertAirText()
+    }
+
     /// Finishes onboarding and starts tracking.
     func completeOnboarding() async {
         settings.hasCompletedOnboarding = true
@@ -142,7 +158,7 @@ final class AppModel {
             capture.stop()
             isRunning = false
         }
-        overlay.setVisible(settings.showOverlay && isRunning)
+        overlay.setVisible(overlayWanted)
     }
 
     private func reevaluatePower() {

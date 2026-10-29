@@ -31,6 +31,20 @@ struct MenuContentView: View {
                 get: { model.status.isArmed },
                 set: { armed in Task { await model.setArmed(armed) } }))
                 .disabled(!model.isRunning)
+            if model.settings.airWritingEnabled {
+                Toggle("Air writing (\(ArmHotKey.airDisplay))", isOn: Binding(
+                    get: { model.status.airWriting.isActive },
+                    set: { on in Task { await model.setAirWriting(on) } }))
+                    .disabled(!model.isRunning)
+                if model.status.airWriting.isActive {
+                    if !model.status.airWriting.preview.isEmpty {
+                        Text("“\(model.status.airWriting.preview)”").font(.callout)
+                        Button("Type it") { Task { await model.insertAirText() } }
+                    }
+                    Text("Pinch to write · pause to finish a word · 👍 types · ✌️ deletes a word · ✊ cancels")
+                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
             Toggle("Show overlay", isOn: $model.settings.showOverlay)
 
             if let outcome = model.status.lastOutcome {
@@ -53,6 +67,7 @@ struct MenuContentView: View {
     private var statusLine: String {
         if let reason = model.pauseReason { return reason }
         if !model.isRunning { return "Camera off" }
+        if model.status.airWriting.isActive { return "Air writing" + (model.status.airWriting.pendingWords > 0 ? " · reading…" : "") }
         if model.status.isArmed { return "Armed · \(Int(model.status.framesPerSecond)) fps" }
         if model.status.armProgress > 0 { return "Arming… \(Int(model.status.armProgress * 100))%" }
         if model.status.handVisible, let reason = model.status.armRejection { return "Not arming: \(reason.explanation)" }

@@ -61,6 +61,18 @@ struct GeneralSettings: View {
                             value: $model.settings.typingGuardSeconds, in: 0...3, step: 0.2)
                 }
             }
+            Section("Air writing") {
+                Toggle("Touch your temple (or press \(ArmHotKey.airDisplay)) to write in the air", isOn: $model.settings.airWritingEnabled)
+                LabeledContent("Pause that ends a word") {
+                    Stepper(String(format: "%.1f s", model.settings.airWritingWordPause),
+                            value: $model.settings.airWritingWordPause, in: 0.5...2.5, step: 0.1)
+                }
+                .disabled(!model.settings.airWritingEnabled)
+                Toggle("Tidy recognized words with Apple Intelligence", isOn: $model.settings.airWritingCleanup)
+                    .disabled(!model.settings.airWritingEnabled)
+                Text("Pinch thumb and index to write, release to lift the pen. Thumbs-up types the text; two fingers delete a word; a fist cancels.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("Apple Intelligence") {
                 Toggle("Use Apple Intelligence for smart gestures and Ask", isOn: $model.settings.useAppleIntelligence)
                 Text(model.appleIntelligenceStatus).font(.caption).foregroundStyle(.secondary)
