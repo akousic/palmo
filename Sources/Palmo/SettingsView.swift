@@ -35,6 +35,20 @@ struct GeneralSettings: View {
                 LabeledContent("Pointer speed") {
                     Slider(value: $model.settings.cursorGain, in: 0.5...3.0) { Text("Pointer speed") }
                 }
+                LabeledContent("Fine control when moving slowly") {
+                    Slider(value: $model.settings.pointerPrecision, in: 0.15...1.0) { Text("Precision") }
+                        minimumValueLabel: { Text("Finer").font(.caption) } maximumValueLabel: { Text("Off").font(.caption) }
+                }
+                LabeledContent("Acceleration for fast moves") {
+                    Slider(value: $model.settings.pointerAcceleration, in: 0...4) { Text("Acceleration") }
+                }
+                LabeledContent("Jitter smoothing") {
+                    Slider(value: $model.settings.pointerSmoothing, in: 0...1) { Text("Smoothing") }
+                }
+                Picker("Pointer follows", selection: $model.settings.pointerAnchor) {
+                    ForEach(PointerAnchor.allCases) { Text($0.title).tag($0) }
+                }
+                Toggle("Snap clicks onto nearby buttons", isOn: $model.settings.snapToTargets)
                 LabeledContent("Auto-disarm after idle") {
                     Stepper("\(Int(model.settings.idleDisarmSeconds)) s", value: $model.settings.idleDisarmSeconds, in: 5...120, step: 5)
                 }

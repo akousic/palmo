@@ -92,7 +92,7 @@ struct CursorMapperTests {
 
     @Test("Faster motion moves further (acceleration)")
     func acceleration() throws {
-        var slow = CursorMapper(), fast = CursorMapper()
+        var slow = CursorMapper(smoothing: 0), fast = CursorMapper(smoothing: 0)
         _ = slow.update(handPoint: Point2D(x: 0.5, y: 0.5), at: 0, cursor: (500, 400), bounds: bounds)
         _ = fast.update(handPoint: Point2D(x: 0.5, y: 0.5), at: 0, cursor: (500, 400), bounds: bounds)
         let aOpt = slow.update(handPoint: Point2D(x: 0.51, y: 0.5), at: 0.2, cursor: (500, 400), bounds: bounds)
@@ -123,5 +123,68 @@ struct CursorMapperTests {
         let nextOpt = mapper.update(handPoint: Point2D(x: 0.6, y: 0.6), at: 1.0 / 30, cursor: (990, 10), bounds: bounds)
         let next = try #require(nextOpt)
         #expect(next.x <= 1000 && next.y >= 0)
+    }
+
+    @Test("Slow hand motion is scaled down for precision; fast motion is scaled up")
+    func precisionCurve() {
+        let mapper = CursorMapper(precision: 0.35, acceleration: 1.6)
+        #expect(abs(mapper.speedFactor(forSpeed: 0.01) - 0.35) < 1e-9)
+        #expect(abs(mapper.speedFactor(forSpeed: 5) - 2.6) < 1e-9)
+        #expect(mapper.speedFactor(forSpeed: 0.3) > 0.35 && mapper.speedFactor(forSpeed: 0.3) < 2.6)
+        // Monotonic.
+        var previous = 0.0
+        for speed in stride(from: 0.0, through: 1.0, by: 0.05) {
+            let f = mapper.speedFactor(forSpeed: speed)
+            #expect(f >= previous)
+            previous = f
+        }
+    }
+
+    @Test("A slow sweep covers less screen per unit of hand travel than a fast one")
+    func slowSweepIsFiner() {
+        func travel(duration: Double) -> Double {
+            var mapper = CursorMapper(smoothing: 0)
+            var cursor = (x: 500.0, y: 400.0)
+            let frames = Int(duration * 30)
+            for i in 0...frames {
+                let x = 0.4 + 0.05 * Double(i) / Double(frames)
+                if let next = mapper.update(handPoint: Point2D(x: x, y: 0.5), at: Double(i) / 30, cursor: cursor, bounds: bounds) {
+                    cursor = next
+                }
+            }
+            return cursor.x - 500
+        }
+        let slow = travel(duration: 2.0)   // 0.025 units/s
+        let fast = travel(duration: 0.1)   // 0.5 units/s
+        #expect(slow > 0)
+        #expect(fast > slow * 2)
+    }
+
+    @Test("Smoothing steadies a jittery, nearly still hand")
+    func smoothingReducesJitter() {
+        func spread(smoothing: Double) -> Double {
+            var mapper = CursorMapper(smoothing: smoothing, deadZone: 0)
+            var cursor = (x: 500.0, y: 400.0)
+            var xs: [Double] = []
+            for i in 0..<90 {
+                let jitter = (i % 2 == 0 ? 1.0 : -1.0) * 0.003
+                if let next = mapper.update(handPoint: Point2D(x: 0.5 + jitter, y: 0.5), at: Double(i) / 30, cursor: cursor, bounds: bounds) {
+                    cursor = next
+                }
+                xs.append(cursor.x)
+            }
+            return (xs.max() ?? 0) - (xs.min() ?? 0)
+        }
+        #expect(spread(smoothing: 1) < spread(smoothing: 0) / 2)
+    }
+
+    @Test("Holding tracks the hand without moving, so the next move doesn't jump")
+    func holdReanchors() throws {
+        var mapper = CursorMapper(smoothing: 0)
+        _ = mapper.update(handPoint: Point2D(x: 0.5, y: 0.5), at: 0, cursor: (500, 400), bounds: bounds)
+        mapper.hold(handPoint: Point2D(x: 0.6, y: 0.5), at: 0.033)
+        let nextOpt = mapper.update(handPoint: Point2D(x: 0.601, y: 0.5), at: 0.066, cursor: (500, 400), bounds: bounds)
+        let next = try #require(nextOpt)
+        #expect(next.x - 500 < 5)
     }
 }

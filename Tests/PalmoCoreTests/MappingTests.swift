@@ -48,6 +48,30 @@ struct MappingTests {
         #expect(try JSONDecoder().decode(PalmoSettings.self, from: data) == settings)
     }
 
+    @Test("Settings saved by an older version decode with new pointer defaults and keep custom mappings")
+    func decodesOlderSettings() throws {
+        var old = PalmoSettings.default
+        old.mappings[.thumbsUp] = .missionControl
+        old.cursorGain = 2.2
+        var json = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        for key in ["pointerPrecision", "pointerAcceleration", "pointerSmoothing", "pointerAnchor", "snapToTargets", "snapRadius"] {
+            json.removeValue(forKey: key)
+        }
+        let decoded = try JSONDecoder().decode(PalmoSettings.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(decoded.mappings[.thumbsUp] == .missionControl)
+        #expect(decoded.cursorGain == 2.2)
+        #expect(decoded.pointerPrecision == PalmoSettings.default.pointerPrecision)
+        #expect(decoded.pointerAnchor == .knuckles)
+        #expect(decoded.snapToTargets)
+    }
+
+    @Test("Smart gestures never resolve to closing or minimizing a window")
+    func windowActionsNotContextual() {
+        #expect(!PalmoAction.contextualCandidates.contains(.closeWindow))
+        #expect(!PalmoAction.contextualCandidates.contains(.minimizeWindow))
+        #expect(PalmoAction.mappable.contains(.closeWindow))
+    }
+
     @Test("Rule-based context resolver knows common apps and has a default")
     func ruleContext() async throws {
         let resolver = RuleBasedContextResolver()
@@ -65,6 +89,9 @@ struct MappingTests {
         ("thumb flick left: previous app", .thumbFlickLeft, .appSwitcherPrevious, nil),
         ("make palm flip smart", .palmFlip, .contextual, nil),
         ("swipe right does nothing", .swipeRight, .none, nil),
+        ("thumbs up closes the window", .thumbsUp, .closeWindow, nil),
+        ("make thumb flick left close window", .thumbFlickLeft, .closeWindow, nil),
+        ("swipe left should minimize the window", .swipeLeft, .minimizeWindow, nil),
     ])
     func parser(text: String, gesture: Gesture, action: PalmoAction, app: String?) throws {
         let change = try #require(RuleBasedMappingParser.parse(text))
