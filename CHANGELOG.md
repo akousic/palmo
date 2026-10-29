@@ -5,6 +5,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+### Changed
+- **Arming is much more reliable.** The open-palm hold now uses its own forgiving palm check (a relaxed hand with
+  fingers less fanned or the thumb part-way in still counts) and a dropout-tolerant timer. Missed or misread frames
+  pause the hold for up to 0.4 s instead of restarting it. The hold is 0.7 s and needs at least 4 qualifying frames.
+- The camera runs at 30 fps whenever a hand is in view, armed or not (previously 15), and at 8 fps when idle (previously 6).
+- The enlarged face zone now applies only while armed, so a palm raised beside the face can arm.
+- When two hands are visible, Palmo tracks the raised one, so a hand resting on the keyboard no longer hides it.
+
+### Added
+- *Arm gesture forgiveness* slider (Settings → Feel).
+- Arming progress ring in the overlay, a menu-bar icon change while arming, and the reason a palm isn't counting
+  shown in the menu.
+- Global **⌃⌥⌘P** shortcut that toggles Armed. It needs no extra permission.
+- Privacy-safe arming diagnostics through `os.Logger` (subsystem `com.kousic.palmo`, category `arming`).
+
 ## [0.2.0] - 2026-10-29
 
 ### Added

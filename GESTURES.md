@@ -108,3 +108,11 @@ If you get false triggers, lower the sensitivity, raise the typing guard, or tur
 If `~/Library/Application Support/Palmo/Models/PalmoMotion.mlmodel` (or `.mlmodelc`) exists, Palmo runs it
 alongside the rules. A prediction with confidence ≥ 0.85 for an enabled motion gesture fires that gesture, with
 the same cooldowns. A *background* prediction never fires anything. See [TRAINING.md](TRAINING.md).
+
+## Arming tips
+
+- Raise an open hand, palm toward the camera, and hold it for about 0.7 s. The overlay ring fills as the hold builds.
+- The fingers don't need to be fully fanned, and brief tracking glitches won't restart the hold.
+- Arming won't start within 0.6 s of typing, or with a hand held over your face.
+- If arming feels stubborn, raise *Arm gesture forgiveness* in Settings → Feel, or press **⌃⌥⌘P**.
+- The menu shows why a palm isn't counting (for example "thumb tucked in" or "typing recently").

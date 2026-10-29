@@ -102,3 +102,13 @@ Settings → Gestures, override it per app under Settings → Apps, or type a re
 ## License
 
 MIT.
+
+## Troubleshooting arming
+
+Palmo logs why open-palm frames were rejected. It logs only reasons and timings, never images or hand positions.
+
+```sh
+log stream --predicate 'subsystem == "com.kousic.palmo" && category == "arming"' --level debug
+```
+
+You can also filter Console.app by the subsystem `com.kousic.palmo`. Press **⌃⌥⌘P** to toggle Armed at any time.

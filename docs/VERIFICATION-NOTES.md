@@ -67,3 +67,8 @@ unattended. These steps need a person in front of the Mac:
 5. Swipe changes Spaces. Three-finger flick opens Mission Control. Thumbs up plays or pauses Music.
 6. Palm flip in Safari reloads the page. In Settings → Ask, type "in Safari, palm flip goes back" and check it.
 7. Hold a fist for 1 s: Palmo disarms.
+
+## 0.3.0 arming
+
+- Covered by unit tests (ArmingTests): dropouts, misreads, gap reset, relaxed palm, non-palms, typing, progress, minimum frames and settings decoding.
+- Needs a manual check on hardware: arming from different distances and lighting, palm beside the face, the ⌃⌥⌘P shortcut and the overlay ring.
