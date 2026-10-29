@@ -145,7 +145,9 @@ public struct PoseClassifier: Sendable {
             if isExtended(.middle) && isExtended(.ring) && isExtended(.little) { return .dial }
             return .indexPinch
         }
-        if middlePinched && m.thumbIndexGap > t.pinchExit && isExtended(.index) { return .middlePinch }
+        // The middle finger must reach toward the thumb: a curled middle finger touching a tucked thumb is
+        // just a pointing hand, not a right-click.
+        if middlePinched && m.thumbIndexGap > t.pinchExit && isExtended(.index) && !isCurled(.middle) { return .middlePinch }
 
         let allCurled = Finger.allCases.allSatisfy(isCurled)
         if allCurled {

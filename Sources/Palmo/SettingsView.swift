@@ -30,10 +30,10 @@ struct GeneralSettings: View {
             }
             Section("Feel") {
                 LabeledContent("Sensitivity") {
-                    Slider(value: $model.settings.sensitivity, in: 0.5...2.0) { Text("Sensitivity") }
+                    Slider(value: $model.settings.sensitivity, in: 0.5...1.5) { Text("Sensitivity") }
                 }
                 LabeledContent("Pointer speed") {
-                    Slider(value: $model.settings.cursorGain, in: 0.5...4.0) { Text("Pointer speed") }
+                    Slider(value: $model.settings.cursorGain, in: 0.5...3.0) { Text("Pointer speed") }
                 }
                 LabeledContent("Auto-disarm after idle") {
                     Stepper("\(Int(model.settings.idleDisarmSeconds)) s", value: $model.settings.idleDisarmSeconds, in: 5...120, step: 5)
