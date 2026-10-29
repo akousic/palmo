@@ -105,6 +105,6 @@ Palmo uses only public APIs:
 - `NSEvent` system-defined media keys
 - `NSAppleScript`
 - `AXIsProcessTrustedWithOptions`
-- `ProcessInfo` (thermal state and Low Power Mode)
+- `ProcessInfo` (Low Power Mode)
 - `NSWorkspace` notifications
 - App Intents

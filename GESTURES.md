@@ -15,9 +15,9 @@ Palmo does nothing until you arm it. This keeps everyday hand movement from trig
 
 Palmo also disarms automatically:
 
-- after the idle timeout (default 20 s with no gesture);
-- when the hand stays out of view;
-- from the menu, Shortcuts or the App Intent.
+- after the idle timeout (default 20 s with no gesture, including when your hand leaves the frame);
+- from the menu, Shortcuts or the App Intent;
+- when the camera pauses for screen sleep, screen lock or Low Power Mode.
 
 While you are typing (within 0.6 s of a key press), Palmo neither arms nor fires gestures. A hand overlapping
 your face is ignored.
@@ -76,7 +76,7 @@ rules apply:
 - **Settings → Apps:** per-app overrides for the frontmost app, or any app you add.
 - **Settings → Ask:** plain-English requests, such as "make thumbs up pause my music" or
   "in Keynote, swipe left should go to the next slide". Apple Intelligence is used when available, otherwise a
-  rule parser. Palmo always shows the change before applying it.
+  rule parser. Palmo shows the change it made and which engine interpreted the request.
 - **Shortcuts:** the *Configure Palmo Gesture* intent does the same (see Verification Notes about Shortcuts
   discovery).
 
