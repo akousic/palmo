@@ -12,7 +12,7 @@ The environment, as recorded on 2026-10-28:
 | What | How | Result |
 |---|---|---|
 | The whole package builds in Swift 6 language mode against SDK 26.5 | `swift build` and `swift build -c release` | ✅ 0 errors, 0 warnings |
-| FoundationModels API shapes | Checked by compiling, not from memory: `SystemLanguageModel.default.isAvailable` and `.availability`, `LanguageModelSession(model:tools:instructions:)`, `Tool` with `@Generable` arguments, `@Generable`/`@Guide(.anyOf)`, `respond(to:generating:)`, `prewarm()` | ✅ compiles |
+| FoundationModels API shapes | Checked by compiling, not from memory: `SystemLanguageModel.default.isAvailable` and `.availability`, `LanguageModelSession(tools:instructions:)`, `Tool` with `@Generable` arguments, `@Generable`/`@Guide(.anyOf)`, `respond(to:generating:)`, `prewarm()` | ✅ compiles |
 | Foundation Models at runtime | `FoundationModelsTests` call the real on-device model: the smart gesture in Keynote, and natural-language configuration | ✅ passed (about 4.8 s) |
 | Recognition logic | `PoseClassifierTests` and `GestureRecognizerTests`, with synthetic 21-joint hands (all shapes; translation, scale and mirror invariance; hysteresis; arm and disarm; typing guard; face zone; click, double-click and drag; right-click; scroll; dial; swipes and flicks; thumbs-up cooldown; palm flip; Core ML threshold) | ✅ |
 | Filtering and cursor mapping | `OneEuroFilterTests`, `CursorMapperTests` | ✅ |
