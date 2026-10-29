@@ -21,6 +21,8 @@ public struct EngineStatus: Sendable, Equatable {
     public var armProgress: Double = 0
     /// Why the latest frame didn't count toward arming, while disarmed with a hand in view.
     public var armRejection: ArmRejection?
+    /// Air-writing state.
+    public var airWriting = AirWritingStatus()
 
     /// Creates an empty status.
     public init() {}
@@ -50,6 +52,14 @@ public actor GestureEngine {
     private var lastLoggedRejection: ArmRejection?
     private var lastRejectionLog: TimeInterval = -.infinity
     private var rejectionCounts: [ArmRejection: Int] = [:]
+    private let setFaceLandmarks: @Sendable (Bool) -> Void
+    private var faceLandmarksOn = false
+    private var airSettings = (enabled: true, wordPause: 1.0, cleanup: false)
+    private var airSession: AirWritingSession?
+    private let templeDetector = TempleDetector()
+    private var templeHold = GestureHold(dwell: 0.6, grace: 0.15, cooldown: 1.2)
+    private var suppressRecognizerUntil: TimeInterval = -.infinity
+    static let airLog = Logger(subsystem: "com.kousic.palmo", category: "airwriting")
 
     /// Arming diagnostics. View with:
     /// `log stream --predicate 'subsystem == "com.kousic.palmo" && category == "arming"' --level debug`
@@ -62,7 +72,8 @@ public actor GestureEngine {
                 router: IntentRouter,
                 frontmost: FrontmostAppTracker,
                 keyboard: KeyboardActivity,
-                setFrameRate: @escaping @Sendable (Double) -> Void) {
+                setFrameRate: @escaping @Sendable (Double) -> Void,
+                setFaceLandmarks: @escaping @Sendable (Bool) -> Void = { _ in }) {
         var c: AsyncStream<EngineStatus>.Continuation!
         status = AsyncStream(bufferingPolicy: .bufferingNewest(1)) { c = $0 }
         statusContinuation = c
@@ -70,6 +81,9 @@ public actor GestureEngine {
         self.frontmost = frontmost
         self.keyboard = keyboard
         self.setFrameRate = setFrameRate
+        self.setFaceLandmarks = setFaceLandmarks
+        let clean = settings.sanitized()
+        airSettings = (clean.airWritingEnabled, clean.airWritingWordPause, clean.airWritingCleanup)
         recognizer = GestureRecognizer(configuration: RecognizerConfiguration(settings: settings.sanitized()))
     }
 
@@ -85,6 +99,9 @@ public actor GestureEngine {
     public func update(settings: PalmoSettings) async {
         let clean = settings.sanitized()
         recognizer.configuration = RecognizerConfiguration(settings: clean)
+        airSettings = (clean.airWritingEnabled, clean.airWritingWordPause, clean.airWritingCleanup)
+        airSession?.setWordPause(clean.airWritingWordPause)
+        if !clean.airWritingEnabled, airSession != nil { setAirWriting(false) }
         await router.update(settings: clean)
     }
 
@@ -106,6 +123,95 @@ public actor GestureEngine {
     /// Whether gestures are armed.
     public var isArmed: Bool { recognizer.isArmed }
 
+    /// Whether air-writing mode is on.
+    public var isAirWriting: Bool { airSession != nil }
+
+    /// Turns air-writing mode on or off (temple touch, shortcut or menu). Turning it on also arms.
+    public func setAirWriting(_ on: Bool) {
+        guard on != (airSession != nil) else { return }
+        if on {
+            guard airSettings.enabled else { return }
+            if !recognizer.isArmed { _ = recognizer.setArmed(true, at: lastFrameTime) }
+            // End any pointer drag or continuous gesture before handing the hand to the pen.
+            let ended = recognizer.process(nil, at: lastFrameTime, context: RecognitionContext())
+            Task { await self.dispatch(ended, at: self.lastFrameTime) }
+            airSession = AirWritingSession(wordPause: airSettings.wordPause)
+            Self.airLog.info("Air writing on")
+        } else {
+            airSession = nil
+            // Don't let the exit gesture (e.g. a fist) leak into normal recognition.
+            suppressRecognizerUntil = lastFrameTime + 0.8
+            Self.airLog.info("Air writing off")
+        }
+        current.isArmed = recognizer.isArmed
+        current.airWriting = airSession?.status ?? AirWritingStatus()
+        updateFaceLandmarks()
+        updateFrameRate(at: lastFrameTime)
+        statusContinuation.yield(current)
+    }
+
+    /// Types the air-writing preview now (menu equivalent of thumbs-up).
+    public func insertAirText() async {
+        guard var session = airSession else { return }
+        let events = session.requestInsert()
+        airSession = session
+        await handleAir(events)
+    }
+
+    private func updateFaceLandmarks() {
+        let want = airSettings.enabled && (recognizer.isArmed || airSession != nil)
+        if want != faceLandmarksOn {
+            faceLandmarksOn = want
+            setFaceLandmarks(want)
+        }
+    }
+
+    /// Temple-touch detection; returns whether the fingertip is at a temple.
+    private func checkTemple(_ pose: HandPose?, face: FaceGeometry?, at t: TimeInterval) -> Bool {
+        var touching = false
+        if airSettings.enabled, recognizer.isArmed || airSession != nil, let pose, let face {
+            touching = templeDetector.touchedSide(pose: pose, face: face) != nil
+        }
+        if templeHold.update(active: touching, at: t) {
+            Self.airLog.info("Temple touch held")
+            setAirWriting(airSession == nil)
+        }
+        return touching
+    }
+
+    private func handleAir(_ events: [AirWritingEvent]) async {
+        for event in events {
+            switch event {
+            case .recognize(let id, let strokes):
+                let cleanup = airSettings.cleanup
+                Task.detached(priority: .userInitiated) {
+                    let result = HandwritingRecognizer.recognize(strokes)
+                    var text = result?.text
+                    if cleanup, let raw = text { text = await AirTextCleaner.clean(raw, alternatives: result?.alternatives ?? []) }
+                    await self.completeWord(id: id, text: text, confidence: result?.confidence ?? 0)
+                }
+            case .insert(let text):
+                current.airWriting.lastInserted = text
+                Self.airLog.info("Typing \(text.count, privacy: .public) characters")
+                await router.typeText(text)
+            case .deletedWord:
+                break
+            case .cancel:
+                setAirWriting(false)
+            }
+        }
+    }
+
+    private func completeWord(id: Int, text: String?, confidence: Double) async {
+        Self.airLog.debug("Recognized word (confidence \(confidence, privacy: .public)): \(text ?? "<nothing>", privacy: .private)")
+        guard var session = airSession else { return }
+        let events = session.complete(id: id, text: text)
+        airSession = session
+        current.airWriting = session.status.with(lastInserted: current.airWriting.lastInserted)
+        statusContinuation.yield(current)
+        await handleAir(events)
+    }
+
     /// Processes one frame.
     public func ingest(_ frame: HandFrame) async {
         let t = frame.timestamp
@@ -117,6 +223,20 @@ public actor GestureEngine {
         } else {
             smoother.reset()
         }
+
+        let atTemple = checkTemple(pose, face: frame.faceGeometry, at: t)
+        current.airWriting.templeProgress = templeHold.progress
+        if var session = airSession {
+            let airEvents = session.process(pose, at: t)
+            airSession = session
+            let lastInserted = current.airWriting.lastInserted
+            current.airWriting = session.status.with(lastInserted: lastInserted)
+            current.airWriting.templeProgress = templeHold.progress
+            await handleAir(airEvents)
+            finishFrame(pose: pose, events: [], at: t, force: !airEvents.isEmpty)
+            return
+        }
+        if atTemple || t < suppressRecognizerUntil { pose = nil }
 
         if let pose, let classifier, recognizer.isArmed {
             poseWindow.append(pose)
@@ -148,15 +268,21 @@ public actor GestureEngine {
         if recognizer.isArmed { current.armProgress = 0 }
         current.armRejection = (recognizer.isArmed || pose == nil) ? nil : recognizer.lastArmRejection
 
+        finishFrame(pose: pose, events: events, at: t, force: false)
+    }
+
+    private func finishFrame(pose: HandPose?, events: [GestureEvent], at t: TimeInterval, force: Bool) {
         frameTimes.append(t)
         frameTimes.removeAll { t - $0 > 1 }
         current.isArmed = recognizer.isArmed
         current.handVisible = pose != nil
-        current.shape = recognizer.currentShape
+        current.shape = airSession == nil ? recognizer.currentShape : .unknown
         current.pose = pose
         current.framesPerSecond = Double(frameTimes.count)
+        if airSession == nil { current.airWriting.isActive = false }
+        updateFaceLandmarks()
         updateFrameRate(at: t)
-        if t - lastStatusEmit >= 1.0 / 15 || !events.isEmpty {
+        if t - lastStatusEmit >= 1.0 / 15 || !events.isEmpty || force {
             lastStatusEmit = t
             statusContinuation.yield(current)
         }
@@ -210,7 +336,7 @@ public actor GestureEngine {
     /// Idle throttling: 30 fps while armed or while a hand is in view (so the arm hold builds quickly),
     /// 8 fps when nobody is gesturing.
     private func updateFrameRate(at t: TimeInterval) {
-        let target: Double = recognizer.isArmed ? 30 : (t - lastHandTime < 3 ? 30 : 8)
+        let target: Double = recognizer.isArmed || airSession != nil ? 30 : (t - lastHandTime < 3 ? 30 : 8)
         if target != current.targetFrameRate {
             current.targetFrameRate = target
             setFrameRate(target)

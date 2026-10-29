@@ -40,11 +40,15 @@ public protocol InputSynthesizing: Sendable {
     /// Frame of the clickable control (button, checkbox, link, window close/minimize/zoom button…)
     /// at or within `radius` points of `point`, if any. Used to snap clicks onto small targets.
     func clickableFrame(near point: ScreenPoint, radius: Double) async -> ScreenRect?
+    /// Types text into the focused field.
+    func typeText(_ text: String) async
 }
 
 extension InputSynthesizing {
     /// Default: no target snapping.
     public func clickableFrame(near point: ScreenPoint, radius: Double) async -> ScreenRect? { nil }
+    /// Default: no typing.
+    public func typeText(_ text: String) async {}
 }
 
 /// Thread-safe one-shot continuation resumer used to race work against a timeout.

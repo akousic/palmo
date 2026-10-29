@@ -57,6 +57,12 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
     public var snapRadius: Double
     /// How forgiving the arm gesture (open-palm hold) is, `0.5...1.5`. Higher arms more easily.
     public var armSensitivity: Double
+    /// Air writing: touch your temple (or press ⌃⌥⌘W) to write words in the air and type them.
+    public var airWritingEnabled: Bool = true
+    /// Seconds the pen must stay up before the strokes so far are recognized as a word.
+    public var airWritingWordPause: Double = 1.0
+    /// Tidy recognized words with the on-device language model (falls back to the raw text).
+    public var airWritingCleanup: Bool = false
 
     /// Creates settings.
     public init(enabledGestures: Set<Gesture> = Set(Gesture.allCases),
@@ -103,6 +109,7 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
         case enabledGestures, sensitivity, cursorGain, mappings, appOverrides, appNames, useAppleIntelligence
         case showOverlay, idleDisarmSeconds, typingGuardSeconds, pauseOnLowPower, hasCompletedOnboarding
         case pointerPrecision, pointerAcceleration, pointerSmoothing, pointerAnchor, snapToTargets, snapRadius, armSensitivity
+        case airWritingEnabled, airWritingWordPause, airWritingCleanup
     }
 
     /// Decodes settings, filling in defaults for any key missing from older saved versions,
@@ -129,6 +136,9 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
         snapToTargets = try c.decodeIfPresent(Bool.self, forKey: .snapToTargets) ?? d.snapToTargets
         snapRadius = try c.decodeIfPresent(Double.self, forKey: .snapRadius) ?? d.snapRadius
         armSensitivity = try c.decodeIfPresent(Double.self, forKey: .armSensitivity) ?? d.armSensitivity
+        airWritingEnabled = try c.decodeIfPresent(Bool.self, forKey: .airWritingEnabled) ?? d.airWritingEnabled
+        airWritingWordPause = try c.decodeIfPresent(Double.self, forKey: .airWritingWordPause) ?? d.airWritingWordPause
+        airWritingCleanup = try c.decodeIfPresent(Bool.self, forKey: .airWritingCleanup) ?? d.airWritingCleanup
     }
 
     /// Factory defaults for rebindable gestures.
@@ -163,6 +173,7 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
         copy.pointerSmoothing = min(max(pointerSmoothing, 0), 1)
         copy.snapRadius = min(max(snapRadius, 4), 40)
         copy.armSensitivity = min(max(armSensitivity, 0.5), 1.5)
+        copy.airWritingWordPause = min(max(airWritingWordPause, 0.5), 2.5)
         copy.enabledGestures.insert(.arm)
         copy.enabledGestures.insert(.disarm)
         return copy

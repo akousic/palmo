@@ -181,6 +181,29 @@ public actor SystemInputSynthesizer: InputSynthesizing {
         }
     }
 
+    /// Types text with Unicode keyboard events, a few characters per event (works for any language and emoji).
+    public func typeText(_ text: String) async {
+        log.markKey()
+        var batch: [Character] = []
+        func post(_ chars: [Character]) {
+            let units = Array(String(chars).utf16)
+            for down in [true, false] {
+                let event = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: down)
+                units.withUnsafeBufferPointer { event?.keyboardSetUnicodeString(stringLength: units.count, unicodeString: $0.baseAddress) }
+                event?.post(tap: .cghidEventTap)
+            }
+        }
+        for ch in text {
+            batch.append(ch)
+            if batch.count == 8 {
+                post(batch)
+                batch.removeAll()
+                try? await Task.sleep(for: .milliseconds(6))
+            }
+        }
+        if !batch.isEmpty { post(batch) }
+    }
+
     // MARK: - Helpers
 
     private func postKey(_ key: KeyCode, flags: CGEventFlags) {

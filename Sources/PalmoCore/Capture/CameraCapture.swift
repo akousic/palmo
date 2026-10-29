@@ -7,13 +7,16 @@ public struct HandFrame: Sendable {
     public var pose: HandPose?
     /// The most recent face rectangle.
     public var face: Rect2D?
+    /// Face box and eye corners, when face landmarks are running.
+    public var faceGeometry: FaceGeometry?
     /// Media timestamp in seconds.
     public var timestamp: TimeInterval
 
     /// Creates a frame.
-    public init(pose: HandPose?, face: Rect2D?, timestamp: TimeInterval) {
+    public init(pose: HandPose?, face: Rect2D?, timestamp: TimeInterval, faceGeometry: FaceGeometry? = nil) {
         self.pose = pose
-        self.face = face
+        self.face = face ?? faceGeometry?.rect
+        self.faceGeometry = faceGeometry
         self.timestamp = timestamp
     }
 }
@@ -95,6 +98,11 @@ public final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBuffer
         }
     }
 
+    /// Turns face-landmark detection (used to find the temples for air writing) on or off.
+    public func setFaceLandmarks(_ on: Bool) {
+        queue.async { self.tracker.useFaceLandmarks = on }
+    }
+
     /// Limits Vision processing to at most `fps` frames per second (energy throttle).
     public func setTargetFrameRate(_ fps: Double) {
         queue.async { self.minInterval = 1.0 / max(1, min(fps, 30)) }
@@ -143,7 +151,7 @@ public final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBuffer
               let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         lastProcessed = timestamp
         let result = tracker.process(pixelBuffer, timestamp: timestamp)
-        continuation.yield(HandFrame(pose: result.pose, face: result.face, timestamp: timestamp))
+        continuation.yield(HandFrame(pose: result.pose, face: result.face?.rect, timestamp: timestamp, faceGeometry: result.face))
     }
 
     private func finishClip() {

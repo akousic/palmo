@@ -14,7 +14,10 @@ final class HandTracker {
     }()
     private let faceRequest = VNDetectFaceRectanglesRequest()
     private var frameIndex = 0
-    private var lastFace: (rect: Rect2D, time: TimeInterval)?
+    private let landmarksRequest = VNDetectFaceLandmarksRequest()
+    private var lastFace: (geometry: FaceGeometry, time: TimeInterval)?
+    /// When set (air writing available while armed), face landmarks run every other frame so temples can be located.
+    var useFaceLandmarks = false
 
     /// Vision joint names in `Joint` order.
     static let visionJoints: [VNHumanHandPoseObservation.JointName] = [
@@ -27,19 +30,20 @@ final class HandTracker {
     ]
 
     /// Detects one hand (and, every sixth frame, the face). Coordinates are mirrored into user perspective.
-    func process(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> (pose: HandPose?, face: Rect2D?) {
+    func process(_ pixelBuffer: CVPixelBuffer, timestamp: TimeInterval) -> (pose: HandPose?, face: FaceGeometry?) {
         frameIndex &+= 1
-        let runFace = frameIndex % 6 == 0
+        let runFace = frameIndex % (useFaceLandmarks ? 2 : 6) == 0
+        let faceReq: VNImageBasedRequest = useFaceLandmarks ? landmarksRequest : faceRequest
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
         do {
-            try handler.perform(runFace ? [handRequest, faceRequest] : [handRequest])
+            try handler.perform(runFace ? [handRequest, faceReq] : [handRequest])
         } catch {
             return (nil, currentFace(at: timestamp))
         }
         if runFace {
-            if let face = faceRequest.results?.max(by: { $0.boundingBox.width < $1.boundingBox.width }) {
-                let box = face.boundingBox
-                lastFace = (Rect2D(minX: 1 - box.maxX, minY: box.minY, width: box.width, height: box.height), timestamp)
+            let faces = (faceReq.results as? [VNFaceObservation]) ?? []
+            if let face = faces.max(by: { $0.boundingBox.width < $1.boundingBox.width }) {
+                lastFace = (Self.geometry(of: face), timestamp)
             } else {
                 lastFace = nil
             }
@@ -74,8 +78,24 @@ final class HandTracker {
         return best.map { ($0.0, $0.1) }
     }
 
-    private func currentFace(at time: TimeInterval) -> Rect2D? {
+    /// Face box plus outer eye corners, mirrored into user perspective.
+    static func geometry(of face: VNFaceObservation) -> FaceGeometry {
+        let box = face.boundingBox
+        let rect = Rect2D(minX: 1 - box.maxX, minY: box.minY, width: box.width, height: box.height)
+        var geometry = FaceGeometry(rect: rect)
+        let centerX = rect.minX + rect.width / 2
+        for region in [face.landmarks?.leftEye, face.landmarks?.rightEye].compactMap({ $0 }) {
+            let points = region.normalizedPoints.map {
+                Point2D(x: 1 - (box.minX + Double($0.x) * box.width), y: box.minY + Double($0.y) * box.height)
+            }
+            guard let outer = points.max(by: { abs($0.x - centerX) < abs($1.x - centerX) }) else { continue }
+            if outer.x < centerX { geometry.leftEyeOuter = outer } else { geometry.rightEyeOuter = outer }
+        }
+        return geometry
+    }
+
+    private func currentFace(at time: TimeInterval) -> FaceGeometry? {
         guard let lastFace, time - lastFace.time < 1.0 else { return nil }
-        return lastFace.rect
+        return lastFace.geometry
     }
 }

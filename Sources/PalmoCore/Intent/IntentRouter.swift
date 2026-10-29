@@ -184,4 +184,9 @@ public actor IntentRouter {
         guard let next = mapper.update(handPoint: p, at: time, cursor: (cursor.x, cursor.y), bounds: bounds) else { return }
         await synthesizer.moveCursor(to: ScreenPoint(x: next.x, y: next.y), dragging: dragging)
     }
+
+    /// Types text into the focused field (air writing).
+    public func typeText(_ text: String) async {
+        await synthesizer.typeText(text)
+    }
 }
