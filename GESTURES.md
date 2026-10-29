@@ -70,6 +70,25 @@ rules apply:
 | Finder | Quick Look |
 | Anything else | Mission Control |
 
+## Air writing
+
+Write words in the air and Palmo types them into whatever text field has focus.
+
+- **Start:** while armed, hold your index fingertip against either temple for about 0.6 s. You can also press
+  **⌃⌥⌘W** or use *Air writing* in the menu (this arms Palmo if needed).
+- **Write:** pinch thumb and index together to put the pen down, and release to lift it. Write one word at a time,
+  at about the height of your hand. The ink appears in the overlay.
+- **Finish a word:** pause for about 1 s (*Settings → Air writing*). Palmo reads it on-device with Vision and adds it
+  to the preview.
+- **Type it:** hold a thumbs-up. The preview is typed into the focused field with a trailing space, and air writing stays on.
+- **Delete:** hold two fingers (✌️) to clear the word you're writing, or the last word if nothing is in progress.
+- **Stop:** touch your temple again, press ⌃⌥⌘W, or hold a fist (which also cancels the preview). Text that hasn't
+  been typed is discarded.
+
+While air writing is on, other gestures are paused. Recognition uses Vision's text reader, which works best with clear,
+fairly large print-style letters. *Tidy recognized words with Apple Intelligence* optionally fixes small misreads
+on-device, with a 1.5 s timeout.
+
 ## Customizing
 
 - **Settings → Gestures:** turn each gesture on or off, and pick its action.

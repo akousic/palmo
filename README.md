@@ -88,6 +88,11 @@ See [GESTURES.md](GESTURES.md) for details and tuning. You can rebind any discre
 Settings → Gestures, override it per app under Settings → Apps, or type a request in Settings → Ask, such as
 "in Keynote, palm flip should start the slideshow".
 
+### Air writing
+
+Touch your temple with your index finger (or press **⌃⌥⌘W**). Then pinch to write a word in the air, pause, and give a
+thumbs-up to type it. See [GESTURES.md](GESTURES.md#air-writing).
+
 ## Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): the pipeline, concurrency and module map

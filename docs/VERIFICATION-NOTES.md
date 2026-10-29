@@ -72,3 +72,14 @@ unattended. These steps need a person in front of the Mac:
 
 - Covered by unit tests (ArmingTests): dropouts, misreads, gap reset, relaxed palm, non-palms, typing, progress, minimum frames and settings decoding.
 - Needs a manual check on hardware: arming from different distances and lighting, palm beside the face, the ⌃⌥⌘P shortcut and the overlay ring.
+
+
+## Air writing (0.4.0)
+
+Verified by unit tests: temple zones and touch detection (with and without eye landmarks), rejection of the
+nose, mouth, chin and a curled finger, hold timing, stroke debouncing and word pauses, and the session's
+insert, delete and cancel flows. Synthetic handwriting (polyline glyphs with wobble) rendered and read by Vision:
+8 of 8 test words read exactly. An earlier 30-sample prototype got 28–29 of 30.
+
+Not yet verified live: real air-writing accuracy with camera jitter, temple detection with glasses or hair over the
+temple, and typing into secure text fields (macOS blocks synthesized input there).

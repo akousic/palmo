@@ -5,6 +5,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-29
+
+### Added
+- **Air writing.** Touch your temple with your index finger (about 0.6 s, while armed) or press ⌃⌥⌘W, then pinch to
+  write words in the air. Pauses separate words, Vision reads them on-device, and a thumbs-up types the text into the
+  focused field. Two fingers delete a word; a fist or another temple touch exits.
+- Ink canvas, pen dot and recognized-text preview in the overlay. The overlay shows while writing even when it's turned off.
+- *Air writing* settings: on/off, the pause that ends a word, and optional Apple Intelligence tidy-up.
+- Face landmarks (eye corners) locate the temples. Face detection runs more often only while armed or writing.
+
 ## [0.3.0] - 2026-10-29
 
 ### Changed
