@@ -31,7 +31,7 @@ public enum HandShape: String, Sendable, Hashable, Codable, CaseIterable {
 /// Scale-invariant measurements of a pose that the rules are built on.
 public struct PoseMetrics: Sendable, Hashable {
     /// Per-finger extension ratio: distance(tip, wrist) / distance(pip, wrist). >1.2 extended, <1.0 curled.
-    public var extension: [Finger: Double]
+    public var fingerExtension: [Finger: Double]
     /// Thumb tip to index knuckle, in hand sizes.
     public var thumbToIndexMCP: Double
     /// Thumb tip to little knuckle, in hand sizes.
@@ -61,7 +61,7 @@ public struct PoseMetrics: Sendable, Hashable {
             let pip = max(pose[finger.pip].distance(to: wrist), 1e-4)
             ext[finger] = tip / pip
         }
-        self.extension = ext
+        self.fingerExtension = ext
         thumbToIndexMCP = pose[.thumbTip].distance(to: pose[.indexMCP]) / size
         thumbToLittleMCP = pose[.thumbTip].distance(to: pose[.littleMCP]) / size
         thumbIndexGap = pose[.thumbTip].distance(to: pose[.indexTip]) / size
@@ -132,8 +132,8 @@ public struct PoseClassifier: Sendable {
         guard pose.meanConfidence >= thresholds.minConfidence else { return .unknown }
         let m = PoseMetrics(pose)
         let t = thresholds
-        func isExtended(_ f: Finger) -> Bool { (m.extension[f] ?? 0) > t.extended }
-        func isCurled(_ f: Finger) -> Bool { (m.extension[f] ?? 0) < t.curled }
+        func isExtended(_ f: Finger) -> Bool { (m.fingerExtension[f] ?? 0) > t.extended }
+        func isCurled(_ f: Finger) -> Bool { (m.fingerExtension[f] ?? 0) < t.curled }
         let thumbExtended = m.thumbToIndexMCP > t.thumbOutFromIndex && m.thumbToLittleMCP > t.thumbOutFromLittle
 
         let indexPinchLimit = (previous == .indexPinch || previous == .dial) ? t.pinchExit : t.pinchEnter
