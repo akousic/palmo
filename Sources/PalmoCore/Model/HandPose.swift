@@ -51,7 +51,7 @@ public struct Rect2D: Sendable, Hashable, Codable {
         self.height = height
     }
 
-    /// Returns a copy grown by `amount` on every side.
+    /// Returns a copy shrunk by `amount` on every side (a negative amount grows it).
     public func insetBy(_ amount: Double) -> Rect2D {
         Rect2D(minX: minX + amount, minY: minY + amount, width: width - 2 * amount, height: height - 2 * amount)
     }
