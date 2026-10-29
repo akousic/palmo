@@ -12,7 +12,8 @@ struct PalmoApp: App {
         MenuBarExtra {
             MenuContentView(model: model)
         } label: {
-            Image(systemName: model.status.isArmed ? "hand.raised.fill" : (model.isRunning ? "hand.raised" : "hand.raised.slash"))
+            Image(systemName: model.status.isArmed ? "hand.raised.fill"
+                  : (model.status.armProgress > 0 ? "hand.raised.circle.fill" : (model.isRunning ? "hand.raised" : "hand.raised.slash")))
                 .accessibilityLabel(model.status.isArmed ? "Palmo armed" : "Palmo")
         }
         .menuBarExtraStyle(.window)
@@ -26,6 +27,12 @@ struct PalmoApp: App {
 /// Starts the model after launch (MenuBarExtra content is lazy, so launch work lives here).
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Task { @MainActor in await AppModel.shared.launch() }
+        Task { @MainActor in
+            await AppModel.shared.launch()
+            ArmHotKey.shared.register {
+                let model = AppModel.shared
+                Task { await model.setArmed(!model.status.isArmed) }
+            }
+        }
     }
 }

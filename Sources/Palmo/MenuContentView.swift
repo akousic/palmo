@@ -27,7 +27,7 @@ struct MenuContentView: View {
             }
 
             Toggle("Camera tracking", isOn: $model.trackingEnabled)
-            Toggle("Armed", isOn: Binding(
+            Toggle("Armed (\(ArmHotKey.display))", isOn: Binding(
                 get: { model.status.isArmed },
                 set: { armed in Task { await model.setArmed(armed) } }))
                 .disabled(!model.isRunning)
@@ -54,7 +54,9 @@ struct MenuContentView: View {
         if let reason = model.pauseReason { return reason }
         if !model.isRunning { return "Camera off" }
         if model.status.isArmed { return "Armed · \(Int(model.status.framesPerSecond)) fps" }
-        return "Show an open palm for a moment to arm"
+        if model.status.armProgress > 0 { return "Arming… \(Int(model.status.armProgress * 100))%" }
+        if model.status.handVisible, let reason = model.status.armRejection { return "Not arming: \(reason.explanation)" }
+        return "Hold an open palm to arm, or press \(ArmHotKey.display)"
     }
 }
 

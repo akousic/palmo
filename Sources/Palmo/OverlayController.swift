@@ -62,7 +62,18 @@ struct OverlayView: View {
             HandSkeleton(pose: state.status.pose, armed: state.status.isArmed)
                 .frame(width: 110, height: 90)
             HStack(spacing: 6) {
-                Circle().fill(state.status.isArmed ? Color.green : Color.gray).frame(width: 8, height: 8)
+                if !state.status.isArmed && state.status.armProgress > 0 {
+                    ZStack {
+                        Circle().stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
+                        Circle().trim(from: 0, to: state.status.armProgress)
+                            .stroke(Color.green, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                            .animation(.linear(duration: 0.1), value: state.status.armProgress)
+                    }
+                    .frame(width: 12, height: 12)
+                } else {
+                    Circle().fill(state.status.isArmed ? Color.green : Color.gray).frame(width: 8, height: 8)
+                }
                 Text(caption).font(.caption.weight(.medium)).lineLimit(1)
             }
             .padding(.horizontal, 10).padding(.vertical, 5)
@@ -73,7 +84,10 @@ struct OverlayView: View {
 
     private var caption: String {
         if let outcome = state.status.lastOutcome, state.status.isArmed { return OutcomeText.describe(outcome) }
-        return state.status.isArmed ? "Armed" : (state.status.handVisible ? "Hold ✋ to arm" : "Palmo")
+        if state.status.isArmed { return "Armed" }
+        if state.status.armProgress > 0 { return "Arming… keep holding ✋" }
+        if state.status.handVisible, let reason = state.status.armRejection { return "Hold ✋ to arm · \(reason.explanation)" }
+        return state.status.handVisible ? "Hold ✋ to arm" : "Palmo"
     }
 }
 

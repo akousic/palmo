@@ -49,6 +49,10 @@ struct GeneralSettings: View {
                     ForEach(PointerAnchor.allCases) { Text($0.title).tag($0) }
                 }
                 Toggle("Snap clicks onto nearby buttons", isOn: $model.settings.snapToTargets)
+                LabeledContent("Arm gesture forgiveness") {
+                    Slider(value: $model.settings.armSensitivity, in: 0.5...1.5) { Text("Arm forgiveness") }
+                        minimumValueLabel: { Text("Strict").font(.caption) } maximumValueLabel: { Text("Easy").font(.caption) }
+                }
                 LabeledContent("Auto-disarm after idle") {
                     Stepper("\(Int(model.settings.idleDisarmSeconds)) s", value: $model.settings.idleDisarmSeconds, in: 5...120, step: 5)
                 }
