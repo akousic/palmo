@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleDisplayName</key><string>Palmo</string>
+	<key>CFBundleExecutable</key><string>Palmo</string>
+	<key>CFBundleIdentifier</key><string>com.kousic.palmo</string>
+	<key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+	<key>CFBundleName</key><string>Palmo</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>0.1.0</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key><string>26.0</string>
+	<key>LSUIElement</key><true/>
+	<key>NSHighResolutionCapable</key><true/>
+	<key>NSHumanReadableCopyright</key><string>Copyright © 2026 Kousic Prakash. MIT License.</string>
+	<key>NSCameraUsageDescription</key><string>Palmo uses the camera to see your hand gestures. Video is processed on this Mac and never stored or sent anywhere, except training clips you record yourself.</string>
+	<key>NSAppleEventsUsageDescription</key><string>Palmo sends commands to apps such as Music, Spotify and Keynote when you map a gesture to them (for example, play/pause or next slide).</string>
+</dict>
+</plist>
