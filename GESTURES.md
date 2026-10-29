@@ -26,8 +26,8 @@ your face is ignored.
 
 | | Gesture | Rule | Action |
 |---|---|---|---|
-| ☝️ | **Point and move** | Index extended, others curled | Relative pointer motion with acceleration, One Euro smoothing and a dead zone. Moving fast covers more distance. Pausing re-centers ("clutch"). |
-| 🤏 | **Pinch click** | Thumb tip meets index tip, released within 0.3 s | Click. Two clicks within 0.4 s make a double-click. |
+| ☝️ | **Point and move** | Index extended, others curled | Relative pointer motion, steered by your index and middle knuckles by default. Slow motion is scaled down for precision and quick motion accelerates. Smoothing removes jitter when the hand is nearly still. To reposition ("clutch"), relax the index or drop the hand, move, and point again. |
+| 🤏 | **Pinch click** | Thumb tip meets index tip, released within 0.3 s | Click. Two clicks within 0.4 s make a double-click. The cursor freezes as the thumb approaches and for 0.2 s after release, and clicks just off a button snap onto it. |
 | 🤏➡️ | **Pinch drag** | Pinch held longer than 0.3 s | Mouse down, drag with hand motion, mouse up on release. |
 | 🤌 | **Middle pinch** | Thumb meets middle finger while the index stays up | Right-click |
 | ✌️↕️ | **Two-finger scroll** | Index and middle extended together | Scroll follows hand motion, natural direction |
@@ -85,6 +85,21 @@ rules apply:
 - **Sensitivity** (0.5–1.5) scales the pinch thresholds, the curl and extension thresholds, and the motion
   distances. Higher means easier to trigger.
 - **Pointer speed** (0.5–3.0) scales the cursor gain.
+- **Fine control when moving slowly** (0.15–1, default 0.35): the pointer speed for slow hand motion, as a
+  fraction of normal. Lower is finer. 1 turns the precision zone off.
+- **Acceleration for fast moves** (0–4, default 1.6): the extra speed a quick flick gets.
+- **Jitter smoothing** (0–1, default 0.5): higher is steadier when still, with slightly more lag. 0 is off.
+- **Pointer follows:** *Knuckles* (default) barely moves when you pinch, so clicks don't drift. *Fingertip* is
+  more direct.
+- **Snap clicks onto nearby buttons** (default on): before clicking, Palmo asks Accessibility for a clickable
+  control within about 14 pt of the cursor and moves onto it. Window close, minimize and zoom buttons get a
+  larger radius (about 21 pt).
+
+### Closing and minimizing windows
+
+The **Close window** and **Minimize window** actions press the focused window's own close or minimize button
+through Accessibility, falling back to ⌘W or ⌘M. Map them to any discrete gesture. Smart gestures never pick
+them, so a window is never closed by surprise.
 
 If you get false triggers, lower the sensitivity, raise the typing guard, or turn off the gestures you don't use.
 

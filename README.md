@@ -24,9 +24,12 @@ context-aware "smart" gesture.
 
 ```sh
 swift test                 # unit tests (Swift Testing)
-scripts/build-app.sh       # release build → build/Palmo.app, signed with your Apple Development identity
-open build/Palmo.app
+scripts/build-app.sh       # release build, signed, installed to /Applications/Palmo.app
+open /Applications/Palmo.app
 ```
+
+`build-app.sh` builds `build/Palmo.app`, then installs it to `/Applications/Palmo.app`. If Palmo is running,
+it quits it first and relaunches the new copy afterwards. Pass `--no-install` to stop at `build/Palmo.app`.
 
 `build-app.sh` uses the first "Apple Development" identity in your keychain. To pick one explicitly, pass
 `--identity "Apple Development: you@example.com (TEAMID)"` or set `PALMO_SIGN_IDENTITY`. If no identity is
@@ -34,7 +37,7 @@ found, it signs ad hoc. In that case macOS forgets the Accessibility grant on ev
 
 ### First launch and permissions
 
-1. Open `build/Palmo.app`. A hand icon appears in the menu bar (there is no Dock icon) and onboarding opens.
+1. Open `/Applications/Palmo.app`. A hand icon appears in the menu bar (there is no Dock icon) and onboarding opens.
 2. **Camera:** click *Allow Camera* and confirm the system prompt. If you denied it earlier, use
    *Open Camera Settings*, then go to Privacy & Security → Camera and turn on Palmo.
 3. **Accessibility** (needed to move the pointer, click and press keys): click *Open Accessibility Settings*,
@@ -46,6 +49,22 @@ found, it signs ad hoc. In that case macOS forgets the Accessibility grant on ev
 
 If Accessibility shows as on but nothing happens after a rebuild, remove Palmo from the Accessibility list
 with the – button and add it again. This happens when the signature changes, for example after an ad-hoc build.
+
+**Moving from `build/Palmo.app` to `/Applications`:** the bundle ID and signing identity are the same, so
+macOS usually keeps both grants. If the pointer doesn't move, open System Settings → Privacy & Security →
+Accessibility, select every Palmo entry, remove it with –, click +, choose `/Applications/Palmo.app` and turn
+it on. Then quit and reopen Palmo. If the camera light never comes on, check Privacy & Security → Camera too.
+
+## Pointer tips
+
+- Aim with small, slow movements: slow motion is scaled down for precision, and only quick moves accelerate.
+- To reposition your hand without moving the cursor (like lifting a mouse), relax your index finger or drop
+  your hand, move it, and point again.
+- The cursor freezes as your thumb comes in to pinch and for a moment after release, so clicks land where you
+  aimed. Clicks just off a small button, such as a window's close button, snap onto it.
+- To close or minimize a window without aiming, map a gesture to **Close window** or **Minimize window**
+  (Settings → Gestures, or ask "thumbs up closes the window").
+- Tune it under Settings → General → Feel.
 
 ## Gestures
 

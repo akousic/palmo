@@ -5,6 +5,24 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
+### Added
+- Precision pointer curve: slow hand motion is scaled down (Settings → Feel → *Fine control*, default 0.35×)
+  and fast motion accelerates (*Acceleration*, default +1.6×).
+- A dedicated pointer jitter filter (*Jitter smoothing*) and a smaller dead zone.
+- *Pointer follows* setting. The new default, the index and middle knuckles, stays put while you pinch.
+- The cursor freezes while a pinch forms, while it is held before a drag starts, and for 0.2 s after release.
+- *Snap clicks onto nearby buttons*: Accessibility hit-testing moves a click onto a control within about 14 pt,
+  or about 21 pt for window buttons.
+- **Close window** and **Minimize window** actions, which press the focused window's buttons (⌘W/⌘M fallback),
+  with Ask phrases such as "thumbs up closes the window".
+- `scripts/build-app.sh` installs to `/Applications/Palmo.app`. It quits a running Palmo and relaunches it.
+  Use `--no-install` to skip.
+
+### Changed
+- Settings decode missing keys with defaults, so upgrading keeps existing mappings.
+
 ## [0.1.0] - 2026-10-28
 
 ### Added

@@ -22,6 +22,12 @@ The environment, as recorded on 2026-10-28:
 
 ## Not verified: needs a hands-on check
 
+- **Pointer feel (0.2.0).** The precision and acceleration defaults and the 0.2 s click settle are tuned from
+  unit tests, not live use. Adjust them in Settings → Feel.
+- **Snap to targets and Close/Minimize window** use Accessibility hit-testing with a 50 ms timeout. They are
+  unit-tested with a mock only. Apps with poor Accessibility support, including some Electron apps, may not
+  snap.
+
 The app was **built but never launched** during development, so no permission prompts were triggered
 unattended. These steps need a person in front of the Mac:
 
