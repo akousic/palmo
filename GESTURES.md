@@ -1,0 +1,95 @@
+# Gestures
+
+Palmo tracks one hand: the one closest to the camera, with the highest confidence. All rules use
+**hand-relative** measurements, normalized by palm size and palm orientation. So they work at any distance
+from the camera, with either hand, and with the hand tilted.
+
+## Arming
+
+Palmo does nothing until you arm it. This keeps everyday hand movement from triggering actions.
+
+| | Gesture | Rule |
+|---|---|---|
+| ✋ **Arm** | Open palm toward the camera, held 0.8 s | All four fingers extended, thumb out, fingers fanned |
+| ✊ **Disarm** | Fist held 1 s | All four fingers curled, thumb tucked |
+
+Palmo also disarms automatically:
+
+- after the idle timeout (default 20 s with no gesture);
+- when the hand stays out of view;
+- from the menu, Shortcuts or the App Intent.
+
+While you are typing (within 0.6 s of a key press), Palmo neither arms nor fires gestures. A hand overlapping
+your face is ignored.
+
+## Fast-path gestures (always on, not rebindable)
+
+| | Gesture | Rule | Action |
+|---|---|---|---|
+| ☝️ | **Point and move** | Index extended, others curled | Relative pointer motion with acceleration, One Euro smoothing and a dead zone. Moving fast covers more distance. Pausing re-centers ("clutch"). |
+| 🤏 | **Pinch click** | Thumb tip meets index tip, released within 0.3 s | Click. Two clicks within 0.4 s make a double-click. |
+| 🤏➡️ | **Pinch drag** | Pinch held longer than 0.3 s | Mouse down, drag with hand motion, mouse up on release. |
+| 🤌 | **Middle pinch** | Thumb meets middle finger while the index stays up | Right-click |
+| ✌️↕️ | **Two-finger scroll** | Index and middle extended together | Scroll follows hand motion, natural direction |
+| 🤏🔄 | **Volume dial** | Index pinch with middle, ring and little extended; rotate like a knob | One volume step about every 12° |
+
+Pinches use **hysteresis**: they start when the gap drops below the enter threshold and end only when it rises
+above a wider exit threshold. This stops a borderline pinch from flickering on and off.
+
+## Discrete gestures (rebindable)
+
+| | Gesture | Rule | Default | Cooldown |
+|---|---|---|---|---|
+| 👋⬅️ | **Swipe left** | Open hand moves fast to the left (≥ 3 samples in 0.45 s) | Next Space | 0.8 s |
+| 👋➡️ | **Swipe right** | Same, to the right | Previous Space | 0.8 s |
+| 🤟⬆️ | **Three-finger flick up** | Index, middle and ring up; flick up | Mission Control | 1.0 s |
+| 🤟⬇️ | **Three-finger flick down** | Same, down | App Exposé | 1.0 s |
+| 👍➡️ | **Thumb flick right** | Fist with thumb out; flick right | Next app (⌘-Tab) | 0.5 s |
+| 👍⬅️ | **Thumb flick left** | Same, left | Previous app | 0.5 s |
+| 👍 | **Thumbs up** | Fist with thumb pointing up, held 0.5 s | Play / pause | 1.5 s |
+| ✌️👉 | **Peace flick right** | V sign (fingers spread); flick right | Next track | 0.8 s |
+| ✌️👈 | **Peace flick left** | Same, left | Previous track | 0.8 s |
+| 🖐️🔁 | **Palm flip (smart)** | Open hand turns to the back and returns within 0.7 s | Smart: depends on the app | 1.2 s |
+
+Directions are as you see them in a mirror. "Right" means toward your right.
+
+### The smart gesture
+
+When a gesture is mapped to **Smart**, Palmo asks the on-device model which action fits the frontmost app. It
+caches the answer per app until settings change. If the model is unavailable or takes longer than 1.5 s, these
+rules apply:
+
+| App | Action |
+|---|---|
+| Safari, Chrome, Firefox, Arc, Edge | Reload page |
+| Keynote, PowerPoint, Preview | Next slide |
+| Music, Spotify | Next track |
+| Podcasts, TV, QuickTime Player | Play / pause |
+| Xcode | Run (⌘R) |
+| Zoom, FaceTime, Teams | Toggle meeting mute (⇧⌘M) |
+| Finder | Quick Look |
+| Anything else | Mission Control |
+
+## Customizing
+
+- **Settings → Gestures:** turn each gesture on or off, and pick its action.
+- **Settings → Apps:** per-app overrides for the frontmost app, or any app you add.
+- **Settings → Ask:** plain-English requests, such as "make thumbs up pause my music" or
+  "in Keynote, swipe left should go to the next slide". Apple Intelligence is used when available, otherwise a
+  rule parser. Palmo always shows the change before applying it.
+- **Shortcuts:** the *Configure Palmo Gesture* intent does the same (see Verification Notes about Shortcuts
+  discovery).
+
+### Sensitivity and pointer speed
+
+- **Sensitivity** (0.5–1.5) scales the pinch thresholds, the curl and extension thresholds, and the motion
+  distances. Higher means easier to trigger.
+- **Pointer speed** (0.5–3.0) scales the cursor gain.
+
+If you get false triggers, lower the sensitivity, raise the typing guard, or turn off the gestures you don't use.
+
+## Core ML motion model (optional)
+
+If `~/Library/Application Support/Palmo/Models/PalmoMotion.mlmodel` (or `.mlmodelc`) exists, Palmo runs it
+alongside the rules. A prediction with confidence ≥ 0.85 for an enabled motion gesture fires that gesture, with
+the same cooldowns. A *background* prediction never fires anything. See [TRAINING.md](TRAINING.md).
