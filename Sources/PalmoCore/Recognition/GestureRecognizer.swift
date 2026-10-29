@@ -18,6 +18,9 @@ public enum GestureEvent: Sendable, Equatable {
     case disarmed(DisarmReason)
     /// New absolute control-point position (normalized, user perspective) for relative cursor motion.
     case pointer(Point2D)
+    /// Control-point position while the cursor should stay put: a pinch is forming, a click is
+    /// settling, or a pinch is held but not yet dragging. The router tracks the hand without moving.
+    case pointerHold(Point2D)
     /// A left click; `count` is 2 for a double-click.
     case click(count: Int)
     /// A right click.
@@ -95,6 +98,12 @@ public struct RecognizerConfiguration: Sendable, Hashable {
     public var flipWindow: TimeInterval = 0.7
     /// Minimum confidence for accepting a Core ML motion prediction.
     public var minMotionConfidence: Double = 0.85
+    /// Which part of the hand steers the pointer.
+    public var pointerAnchor: PointerAnchor = .knuckles
+    /// The cursor freezes once the thumb–index gap falls below `pinchExit × pinchApproach`.
+    public var pinchApproach: Double = 1.35
+    /// After a pinch is released, the cursor stays frozen this long so the release doesn't drag it.
+    public var clickSettle: TimeInterval = 0.2
 
     /// Builds a configuration from settings.
     public init(settings: PalmoSettings) {
@@ -103,6 +112,7 @@ public struct RecognizerConfiguration: Sendable, Hashable {
         sensitivity = s.sensitivity
         idleDisarm = s.idleDisarmSeconds
         typingGuard = s.typingGuardSeconds
+        pointerAnchor = s.pointerAnchor
     }
 
     /// Cooldown after a discrete gesture fires.
@@ -145,6 +155,7 @@ public struct GestureRecognizer: Sendable {
     private var lastActivity: TimeInterval = 0
     private var cooldownUntil: [Gesture: TimeInterval] = [:]
     private var pinchStart: TimeInterval?
+    private var settleUntil: TimeInterval = -.infinity
     private var dragging = false
     private var lastClickTime: TimeInterval = -.infinity
     private var lastScrollPoint: Point2D?
@@ -250,8 +261,10 @@ public struct GestureRecognizer: Sendable {
                 events.append(.click(count: count))
             }
             pinchStart = nil
+            settleUntil = time + configuration.clickSettle
         }
         if new == .indexPinch { pinchStart = time }
+        if new == .middlePinch { settleUntil = time + configuration.clickSettle }
         if new == .middlePinch && emit, let fired = fire(.middlePinch, at: time) {
             _ = fired
             events.append(.rightClick)
@@ -265,15 +278,17 @@ public struct GestureRecognizer: Sendable {
         let enabled = configuration.enabled
         switch currentShape {
         case .pointing where enabled.contains(.point):
-            return [.pointer(pose[.indexTip])]
+            let point = controlPoint(pose)
+            let approaching = PoseMetrics(pose).thumbIndexGap < classifier.thresholds.pinchExit * configuration.pinchApproach
+            return [approaching || time < settleUntil ? .pointerHold(point) : .pointer(point)]
         case .indexPinch:
-            let point = Point2D.midpoint(pose[.thumbTip], pose[.indexTip])
+            let point = controlPoint(pose)
             var events: [GestureEvent] = []
             if !dragging, enabled.contains(.pinchDrag), let start = pinchStart, time - start >= configuration.clickMaxDuration {
                 dragging = true
                 events.append(.dragBegan)
             }
-            if dragging { events.append(.dragMoved(point)) }
+            events.append(dragging ? .dragMoved(point) : .pointerHold(point))
             return events
         case .twoFingers where enabled.contains(.twoFingerScroll):
             let mid = Point2D.midpoint(pose[.indexTip], pose[.middleTip])
@@ -365,6 +380,15 @@ public struct GestureRecognizer: Sendable {
         cooldownUntil[gesture] = time + configuration.cooldown(for: gesture)
         if gesture != .middlePinch { resetMotion() }
         return gesture
+    }
+
+    /// The point that steers the cursor. The knuckle anchor sits on the index and middle knuckles,
+    /// which stay still while the fingertips pinch.
+    private func controlPoint(_ pose: HandPose) -> Point2D {
+        switch configuration.pointerAnchor {
+        case .knuckles: Point2D.midpoint(pose[.indexMCP], pose[.middleMCP])
+        case .fingertip: pose[.indexTip]
+        }
     }
 
     private mutating func resetMotion() {

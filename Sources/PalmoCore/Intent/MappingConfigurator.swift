@@ -70,6 +70,8 @@ public enum RuleBasedMappingParser {
         ("next app", .appSwitcherNext), ("switch app", .appSwitcherNext), ("previous app", .appSwitcherPrevious),
         ("reload", .browserReload), ("refresh", .browserReload),
         ("go back", .browserBack), ("back", .browserBack), ("go forward", .browserForward), ("forward", .browserForward),
+        ("closes the window", .closeWindow), ("closes window", .closeWindow), ("close window", .closeWindow), ("minimizes the window", .minimizeWindow), ("close the window", .closeWindow), ("close this window", .closeWindow),
+        ("minimize window", .minimizeWindow), ("minimize the window", .minimizeWindow), ("minimize", .minimizeWindow), ("minimise", .minimizeWindow),
         ("new tab", .newTab), ("close tab", .closeTab), ("close the tab", .closeTab),
         ("next slide", .nextSlide), ("previous slide", .previousSlide),
         ("start the slideshow", .startSlideshow), ("start slideshow", .startSlideshow), ("slideshow", .startSlideshow),

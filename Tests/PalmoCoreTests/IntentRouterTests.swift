@@ -9,6 +9,9 @@ actor MockSynthesizer: InputSynthesizing {
     }
     private(set) var calls: [Call] = []
     var failPerform = false
+    var target: ScreenRect?
+    func setTarget(_ value: ScreenRect?) { target = value }
+    func clickableFrame(near point: ScreenPoint, radius: Double) async -> ScreenRect? { target }
     func setFailPerform(_ value: Bool) { failPerform = value }
     func cursorPosition() async -> ScreenPoint { ScreenPoint(x: 500, y: 400) }
     func screenBounds() async -> ScreenRect { ScreenRect(minX: 0, minY: 0, maxX: 1000, maxY: 800) }
@@ -82,6 +85,43 @@ struct IntentRouterTests {
         let calls = await synth.calls
         #expect(calls.count == 1)
         if case .move(let x, _, false) = calls.first { #expect(x > 500) } else { Issue.record("expected a move") }
+    }
+
+    @Test("A held pointer re-anchors without moving the cursor")
+    func pointerHold() async {
+        let synth = MockSynthesizer()
+        var settings = PalmoSettings.default
+        settings.pointerSmoothing = 0
+        let router = IntentRouter(settings: settings, synthesizer: synth, modelResolver: nil)
+        await router.handle(.pointer(Point2D(x: 0.5, y: 0.5)), at: 0, app: app)
+        await router.handle(.pointerHold(Point2D(x: 0.6, y: 0.5)), at: 1.0 / 30, app: app)
+        #expect(await synth.calls.isEmpty)
+        await router.handle(.pointer(Point2D(x: 0.601, y: 0.5)), at: 2.0 / 30, app: app)
+        let calls = await synth.calls
+        if case .move(let x, _, false) = calls.first { #expect(x - 500 < 5) } else { Issue.record("expected a small move") }
+    }
+
+    @Test("A click just outside a small button snaps onto its center first")
+    func snapsClick() async {
+        let synth = MockSynthesizer()
+        await synth.setTarget(ScreenRect(minX: 505, minY: 395, maxX: 519, maxY: 409))
+        let router = IntentRouter(settings: .default, synthesizer: synth, modelResolver: nil)
+        await router.handle(.click(count: 1), at: 0, app: app)
+        #expect(await synth.calls == [.move(512, 402, false), .click(1)])
+    }
+
+    @Test("Snapping is skipped when the cursor is already on the target or snapping is off")
+    func noSnap() async {
+        let synth = MockSynthesizer()
+        await synth.setTarget(ScreenRect(minX: 490, minY: 390, maxX: 520, maxY: 410))
+        let router = IntentRouter(settings: .default, synthesizer: synth, modelResolver: nil)
+        await router.handle(.click(count: 1), at: 0, app: app)
+        var off = PalmoSettings.default
+        off.snapToTargets = false
+        await synth.setTarget(ScreenRect(minX: 505, minY: 395, maxX: 519, maxY: 409))
+        await router.update(settings: off)
+        await router.handle(.rightClick, at: 1, app: app)
+        #expect(await synth.calls == [.click(1), .rightClick])
     }
 
     @Test("Mapped gestures execute their action")

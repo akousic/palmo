@@ -37,6 +37,14 @@ public protocol InputSynthesizing: Sendable {
     func volume(steps: Int) async
     /// Executes a high-level action in the context of `app`.
     func perform(_ action: PalmoAction, app: AppContext) async throws
+    /// Frame of the clickable control (button, checkbox, link, window close/minimize/zoom button…)
+    /// at or within `radius` points of `point`, if any. Used to snap clicks onto small targets.
+    func clickableFrame(near point: ScreenPoint, radius: Double) async -> ScreenRect?
+}
+
+extension InputSynthesizing {
+    /// Default: no target snapping.
+    public func clickableFrame(near point: ScreenPoint, radius: Double) async -> ScreenRect? { nil }
 }
 
 /// Thread-safe one-shot continuation resumer used to race work against a timeout.

@@ -50,7 +50,9 @@ public actor IntentRouter {
                 fallbackResolver: any ContextResolver = RuleBasedContextResolver(),
                 modelTimeout: Double = 1.5) {
         self.settings = settings.sanitized()
-        self.mapper = CursorMapper(gain: settings.sanitized().cursorGain)
+        var mapper = CursorMapper()
+        mapper.configure(with: settings)
+        self.mapper = mapper
         self.synthesizer = synthesizer
         self.modelResolver = modelResolver
         self.fallbackResolver = fallbackResolver
@@ -60,7 +62,7 @@ public actor IntentRouter {
     /// Applies new settings and clears the context cache.
     public func update(settings newSettings: PalmoSettings) {
         settings = newSettings.sanitized()
-        mapper.gain = settings.cursorGain
+        mapper.configure(with: settings)
         cache.removeAll()
     }
 
@@ -86,12 +88,17 @@ public actor IntentRouter {
         case .pointer(let p):
             await moveCursor(p, at: time, dragging: false)
             return nil
+        case .pointerHold(let p):
+            mapper.hold(handPoint: p, at: time)
+            return nil
         case .click(let count):
             mapper.reset()
+            await snapToTarget()
             await synthesizer.click(count: count)
             return .fastPath(count == 2 ? "Double-click" : "Click")
         case .rightClick:
             mapper.reset()
+            await snapToTarget()
             await synthesizer.rightClick()
             return .fastPath("Right-click")
         case .dragBegan:
@@ -158,6 +165,15 @@ public actor IntentRouter {
         }
         guard let fallback = try? await fallbackResolver.resolve(gesture: gesture, app: app) else { return nil }
         return (fallback, .rules)
+    }
+
+    /// If the cursor is just off a small control, moves it onto the control's center before clicking.
+    private func snapToTarget() async {
+        guard settings.snapToTargets else { return }
+        let cursor = await synthesizer.cursorPosition()
+        guard let frame = await synthesizer.clickableFrame(near: cursor, radius: settings.snapRadius),
+              !frame.contains(x: cursor.x, y: cursor.y) else { return }
+        await synthesizer.moveCursor(to: ScreenPoint(x: frame.midX, y: frame.midY), dragging: false)
     }
 
     private func moveCursor(_ p: Point2D, at time: TimeInterval, dragging: Bool) async {

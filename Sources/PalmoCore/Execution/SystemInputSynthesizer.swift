@@ -131,6 +131,10 @@ public actor SystemInputSynthesizer: InputSynthesizing {
         for _ in 0..<abs(steps) { postMediaKey(key) }
     }
 
+    public func clickableFrame(near point: ScreenPoint, radius: Double) async -> ScreenRect? {
+        AccessibilityTargets.clickableFrame(near: point, radius: radius)
+    }
+
     public func perform(_ action: PalmoAction, app: AppContext) async throws {
         if let source = AppleScriptRunner.script(for: action, bundleID: app.bundleID) {
             do {
@@ -161,6 +165,11 @@ public actor SystemInputSynthesizer: InputSynthesizing {
         case .browserForward: postKey(.rightBracket, flags: .maskCommand)
         case .newTab: postKey(.t, flags: .maskCommand)
         case .closeTab: postKey(.w, flags: .maskCommand)
+        case .closeWindow:
+            // Press the window's own close button (works in tabbed apps too); fall back to ⌘W.
+            if !AccessibilityTargets.pressFocusedWindowButton(kAXCloseButtonAttribute) { postKey(.w, flags: .maskCommand) }
+        case .minimizeWindow:
+            if !AccessibilityTargets.pressFocusedWindowButton(kAXMinimizeButtonAttribute) { postKey(.m, flags: .maskCommand) }
         case .nextSlide: postKey(.rightArrow, flags: .maskSecondaryFn)
         case .previousSlide: postKey(.leftArrow, flags: .maskSecondaryFn)
         case .startSlideshow: postKey(.p, flags: [.maskCommand, .maskAlternate])

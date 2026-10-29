@@ -9,6 +9,7 @@ public enum PalmoAction: String, CaseIterable, Sendable, Codable, Identifiable {
     case nextSpace, previousSpace, missionControl, appExpose, showDesktop
     case appSwitcherNext, appSwitcherPrevious
     case browserReload, browserBack, browserForward, newTab, closeTab
+    case closeWindow, minimizeWindow
     case nextSlide, previousSlide, startSlideshow
     case quickLook, runBuild, toggleMeetingMute, toggleFullScreen
     case undo, escape
@@ -40,6 +41,8 @@ public enum PalmoAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .browserForward: "Forward"
         case .newTab: "New tab"
         case .closeTab: "Close tab"
+        case .closeWindow: "Close window"
+        case .minimizeWindow: "Minimize window"
         case .nextSlide: "Next slide"
         case .previousSlide: "Previous slide"
         case .startSlideshow: "Start slideshow"
@@ -75,6 +78,8 @@ public enum PalmoAction: String, CaseIterable, Sendable, Codable, Identifiable {
         case .browserForward: "Navigate forward (Command-])."
         case .newTab: "Open a new tab (Command-T)."
         case .closeTab: "Close the current tab or window (Command-W)."
+        case .closeWindow: "Close the frontmost window by pressing its close button."
+        case .minimizeWindow: "Minimize the frontmost window to the Dock."
         case .nextSlide: "Advance to the next slide or page (Right Arrow)."
         case .previousSlide: "Go back one slide or page (Left Arrow)."
         case .startSlideshow: "Start presenting the slideshow (Option-Command-P)."
@@ -95,7 +100,10 @@ public enum PalmoAction: String, CaseIterable, Sendable, Codable, Identifiable {
     public static var mappableNames: [String] { mappable.map(\.rawValue) }
 
     /// Concrete actions the context resolver may choose from (everything except `.contextual`).
-    public static var contextualCandidates: [PalmoAction] { allCases.filter { $0 != .contextual } }
+    /// Window close/minimize are excluded so a smart gesture never closes a window by surprise.
+    public static var contextualCandidates: [PalmoAction] {
+        allCases.filter { ![.contextual, .closeWindow, .minimizeWindow].contains($0) }
+    }
 
     /// Raw names of contextual candidates.
     public static var contextualCandidateNames: [String] { contextualCandidates.map(\.rawValue) }

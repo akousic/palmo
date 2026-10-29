@@ -64,6 +64,57 @@ struct GestureRecognizerTests {
         #expect(events.contains { if case .pointer = $0 { true } else { false } })
     }
 
+    @Test("The cursor freezes as the thumb approaches the index, and while a pinch is held before dragging")
+    func freezesForPinch() {
+        var d = RecognizerDriver()
+        d.arm()
+        d.hold(HandFixture.pointing(), for: 0.3)
+        let approaching = d.hold(HandFixture.pose(index: .extended, middle: .curled, ring: .curled, little: .curled,
+                                                  thumb: .nearIndex(gap: 0.45)), for: 0.1)
+        #expect(approaching.contains { if case .pointerHold = $0 { true } else { false } })
+        #expect(!approaching.contains { if case .pointer = $0 { true } else { false } })
+        let pinching = d.hold(HandFixture.pinch(), for: 0.2)
+        #expect(pinching.contains { if case .pointerHold = $0 { true } else { false } })
+        #expect(!pinching.contains { if case .dragMoved = $0 { true } else { false } })
+    }
+
+    @Test("The cursor stays frozen briefly after a click, then moves again")
+    func settlesAfterClick() {
+        var d = RecognizerDriver()
+        d.arm()
+        d.hold(HandFixture.pointing(), for: 0.3)
+        d.hold(HandFixture.pinch(), for: 0.15)
+        let justAfter = d.hold(HandFixture.pointing(), for: 0.1)
+        #expect(justAfter.contains(.click(count: 1)))
+        #expect(!justAfter.contains { if case .pointer = $0 { true } else { false } })
+        let later = d.hold(HandFixture.pointing(), for: 0.3)
+        #expect(later.contains { if case .pointer = $0 { true } else { false } })
+    }
+
+    @Test("The knuckle anchor barely moves when the thumb pinches; the fingertip anchor is selectable")
+    func anchors() {
+        func point(_ events: [GestureEvent]) -> Point2D? {
+            for e in events.reversed() {
+                switch e { case .pointer(let p), .pointerHold(let p): return p; default: continue }
+            }
+            return nil
+        }
+        var d = RecognizerDriver()
+        d.arm()
+        let pointing = point(d.hold(HandFixture.pointing(), for: 0.3))
+        let pinching = point(d.hold(HandFixture.pinch(), for: 0.1))
+        #expect(pointing != nil && pinching != nil)
+        if let a = pointing, let b = pinching { #expect(a.distance(to: b) < 0.005) }
+
+        var settings = PalmoSettings.default
+        settings.pointerAnchor = .fingertip
+        var f = RecognizerDriver(settings: settings)
+        f.arm()
+        let tip = point(f.hold(HandFixture.pointing(), for: 0.3))
+        let knuckle = pointing
+        #expect(tip != nil && knuckle != nil && tip! != knuckle!)
+    }
+
     @Test("A quick pinch clicks; two quick pinches double-click")
     func clicks() {
         var d = RecognizerDriver()
