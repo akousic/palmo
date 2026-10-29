@@ -21,6 +21,8 @@ public enum GestureEvent: Sendable, Equatable {
     /// Control-point position while the cursor should stay put: a pinch is forming, a click is
     /// settling, or a pinch is held but not yet dragging. The router tracks the hand without moving.
     case pointerHold(Point2D)
+    /// Progress `0...1` of an open-palm hold toward arming (emitted while disarmed when it changes; 0 = lost).
+    case armProgress(Double)
     /// A left click; `count` is 2 for a double-click.
     case click(count: Int)
     /// A right click.
@@ -81,7 +83,11 @@ public struct RecognizerConfiguration: Sendable, Hashable {
     /// Typing-guard window.
     public var typingGuard: TimeInterval
     /// Open-palm hold time needed to arm.
-    public var armDwell: TimeInterval = 0.8
+    public var armDwell: TimeInterval = 0.7
+    /// Non-qualifying frames are tolerated this long during the arm hold before it restarts.
+    public var armGrace: TimeInterval = 0.4
+    /// Arm sensitivity `0.5...1.5`; higher accepts a less perfect open palm.
+    public var armSensitivity: Double = 1.0
     /// Fist hold time needed to disarm.
     public var disarmDwell: TimeInterval = 1.0
     /// Hold time for static discrete poses (thumbs up).
@@ -113,6 +119,7 @@ public struct RecognizerConfiguration: Sendable, Hashable {
         idleDisarm = s.idleDisarmSeconds
         typingGuard = s.typingGuardSeconds
         pointerAnchor = s.pointerAnchor
+        armSensitivity = s.armSensitivity
     }
 
     /// Cooldown after a discrete gesture fires.
@@ -145,8 +152,22 @@ public struct GestureRecognizer: Sendable {
     public private(set) var currentShape: HandShape = .unknown
     /// Active configuration.
     public var configuration: RecognizerConfiguration {
-        didSet { classifier = PoseClassifier(thresholds: .scaled(by: configuration.sensitivity)) }
+        didSet {
+            classifier = PoseClassifier(thresholds: .scaled(by: configuration.sensitivity))
+            armTest = .scaled(by: configuration.armSensitivity)
+            armHold.dwell = configuration.armDwell
+            armHold.grace = configuration.armGrace
+        }
     }
+    /// Progress `0...1` of the current arm hold.
+    public var armProgress: Double { armHold.progress }
+    /// Why the latest disarmed frame didn't count toward arming (`nil` if it did, or while armed).
+    public private(set) var lastArmRejection: ArmRejection?
+    /// The rejection that ended the most recent lost arm hold, with how far it got (for diagnostics).
+    public private(set) var lastAbandonedArm: (reason: ArmRejection, progress: Double)?
+    private var armTest: ArmPalmTest
+    private var armHold: ArmAccumulator
+    private var reportedArmProgress = 0.0
 
     private var classifier: PoseClassifier
     private var candidateShape: HandShape = .unknown
@@ -170,6 +191,8 @@ public struct GestureRecognizer: Sendable {
     public init(configuration: RecognizerConfiguration) {
         self.configuration = configuration
         self.classifier = PoseClassifier(thresholds: .scaled(by: configuration.sensitivity))
+        self.armTest = .scaled(by: configuration.armSensitivity)
+        self.armHold = ArmAccumulator(dwell: configuration.armDwell, grace: configuration.armGrace)
     }
 
     /// Arms or disarms from outside (menu, App Intent, power events). Returns the resulting events.
@@ -177,6 +200,9 @@ public struct GestureRecognizer: Sendable {
         guard armed != isArmed else { return [] }
         if armed {
             isArmed = true
+            armHold.reset()
+            reportedArmProgress = 0
+            lastArmRejection = nil
             lastActivity = time
             resetMotion()
             return [.armed]
@@ -192,6 +218,7 @@ public struct GestureRecognizer: Sendable {
             return disarm(.idle)
         }
         guard let pose else {
+            events += trackArm(nil, rejection: .noHand, at: time)
             events += endContinuous()
             candidateShape = .unknown
             currentShape = .unknown
@@ -200,7 +227,9 @@ public struct GestureRecognizer: Sendable {
             lastPalmSide = nil
             return events
         }
-        if let face = context.faceRect, face.insetBy(-0.03).contains(pose.centroid) {
+        // While disarmed only the face itself is excluded, since a raised palm often sits right beside it.
+        if let face = context.faceRect, (isArmed ? face.insetBy(-0.03) : face).contains(pose.centroid) {
+            events += trackArm(nil, rejection: .faceZone, at: time)
             events += endContinuous()
             currentShape = .unknown
             candidateShape = .unknown
@@ -223,13 +252,10 @@ public struct GestureRecognizer: Sendable {
         }
 
         guard isArmed else {
-            if !typing && configuration.enabled.contains(.arm) && currentShape == .openPalm && time - stableSince >= configuration.armDwell {
-                isArmed = true
-                lastActivity = time
-                resetMotion()
-                stableSince = time
-                events.append(.armed)
-            }
+            let rejection: ArmRejection? = !configuration.enabled.contains(.arm) ? .disabled
+                : typing ? .typing : armTest.evaluate(pose)
+            events += trackArm(pose, rejection: rejection, at: time)
+            if isArmed { stableSince = time }
             return events
         }
         if typing {
@@ -382,6 +408,31 @@ public struct GestureRecognizer: Sendable {
         return gesture
     }
 
+    /// Feeds the arm hold. Arms when it completes; emits progress for the overlay when it changes.
+    private mutating func trackArm(_ pose: HandPose?, rejection: ArmRejection?, at time: TimeInterval) -> [GestureEvent] {
+        guard !isArmed else { return [] }
+        lastArmRejection = rejection
+        var restarted = false
+        let progressBefore = armHold.progress
+        let complete = armHold.update(qualifies: rejection == nil, at: time, restarted: &restarted)
+        if restarted { lastAbandonedArm = (rejection ?? .noHand, progressBefore) }
+        if complete {
+            isArmed = true
+            lastActivity = time
+            resetMotion()
+            armHold.reset()
+            reportedArmProgress = 0
+            lastArmRejection = nil
+            return [.armProgress(1), .armed]
+        }
+        let progress = armHold.progress
+        if abs(progress - reportedArmProgress) >= 0.05 || (progress == 0 && reportedArmProgress > 0) {
+            reportedArmProgress = progress
+            return [.armProgress(progress)]
+        }
+        return []
+    }
+
     /// The point that steers the cursor. The knuckle anchor sits on the index and middle knuckles,
     /// which stay still while the fingertips pinch.
     private func controlPoint(_ pose: HandPose) -> Point2D {
@@ -412,6 +463,8 @@ public struct GestureRecognizer: Sendable {
     private mutating func disarm(_ reason: DisarmReason) -> [GestureEvent] {
         var events = endContinuous()
         isArmed = false
+        armHold.reset()
+        reportedArmProgress = 0
         resetMotion()
         lastPalmSide = nil
         events.append(.disarmed(reason))

@@ -8,7 +8,8 @@ import Vision
 final class HandTracker {
     private let handRequest: VNDetectHumanHandPoseRequest = {
         let request = VNDetectHumanHandPoseRequest()
-        request.maximumHandCount = 1
+        // Two hands, so a resting hand on the keyboard can't hide the raised gesturing hand.
+        request.maximumHandCount = 2
         return request
     }()
     private let faceRequest = VNDetectFaceRectanglesRequest()
@@ -43,8 +44,7 @@ final class HandTracker {
                 lastFace = nil
             }
         }
-        guard let observation = handRequest.results?.first,
-              let points = try? observation.recognizedPoints(.all) else {
+        guard let (observation, points) = Self.gesturingHand(handRequest.results ?? []) else {
             return (nil, currentFace(at: timestamp))
         }
         let landmarks: [Landmark] = Self.visionJoints.map { name in
@@ -57,6 +57,21 @@ final class HandTracker {
         default: .unknown
         }
         return (HandPose(landmarks: landmarks, chirality: chirality, timestamp: timestamp), currentFace(at: timestamp))
+    }
+
+    /// Picks the raised hand: the confidently tracked hand whose centroid is highest in the frame.
+    private static func gesturingHand(_ observations: [VNHumanHandPoseObservation])
+        -> (VNHumanHandPoseObservation, [VNHumanHandPoseObservation.JointName: VNRecognizedPoint])? {
+        var best: (VNHumanHandPoseObservation, [VNHumanHandPoseObservation.JointName: VNRecognizedPoint], Double)?
+        for observation in observations {
+            guard let points = try? observation.recognizedPoints(.all) else { continue }
+            let confident = points.values.filter { $0.confidence > 0.3 }
+            guard !confident.isEmpty else { continue }
+            let height = confident.map { Double($0.location.y) }.reduce(0, +) / Double(confident.count)
+            let score = height + Double(confident.count) / 21 * 0.3
+            if best == nil || score > best!.2 { best = (observation, points, score) }
+        }
+        return best.map { ($0.0, $0.1) }
     }
 
     private func currentFace(at time: TimeInterval) -> Rect2D? {

@@ -55,6 +55,8 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
     public var snapToTargets: Bool
     /// Snap radius in points for clicks.
     public var snapRadius: Double
+    /// How forgiving the arm gesture (open-palm hold) is, `0.5...1.5`. Higher arms more easily.
+    public var armSensitivity: Double
 
     /// Creates settings.
     public init(enabledGestures: Set<Gesture> = Set(Gesture.allCases),
@@ -74,7 +76,8 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
                 pointerSmoothing: Double = 0.5,
                 pointerAnchor: PointerAnchor = .knuckles,
                 snapToTargets: Bool = true,
-                snapRadius: Double = 14) {
+                snapRadius: Double = 14,
+                armSensitivity: Double = 1.0) {
         self.enabledGestures = enabledGestures
         self.sensitivity = sensitivity
         self.cursorGain = cursorGain
@@ -93,12 +96,13 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
         self.pointerAnchor = pointerAnchor
         self.snapToTargets = snapToTargets
         self.snapRadius = snapRadius
+        self.armSensitivity = armSensitivity
     }
 
     private enum CodingKeys: String, CodingKey {
         case enabledGestures, sensitivity, cursorGain, mappings, appOverrides, appNames, useAppleIntelligence
         case showOverlay, idleDisarmSeconds, typingGuardSeconds, pauseOnLowPower, hasCompletedOnboarding
-        case pointerPrecision, pointerAcceleration, pointerSmoothing, pointerAnchor, snapToTargets, snapRadius
+        case pointerPrecision, pointerAcceleration, pointerSmoothing, pointerAnchor, snapToTargets, snapRadius, armSensitivity
     }
 
     /// Decodes settings, filling in defaults for any key missing from older saved versions,
@@ -124,6 +128,7 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
         pointerAnchor = (try? c.decodeIfPresent(PointerAnchor.self, forKey: .pointerAnchor)) ?? d.pointerAnchor
         snapToTargets = try c.decodeIfPresent(Bool.self, forKey: .snapToTargets) ?? d.snapToTargets
         snapRadius = try c.decodeIfPresent(Double.self, forKey: .snapRadius) ?? d.snapRadius
+        armSensitivity = try c.decodeIfPresent(Double.self, forKey: .armSensitivity) ?? d.armSensitivity
     }
 
     /// Factory defaults for rebindable gestures.
@@ -157,6 +162,7 @@ public struct PalmoSettings: Sendable, Hashable, Codable {
         copy.pointerAcceleration = min(max(pointerAcceleration, 0), 4)
         copy.pointerSmoothing = min(max(pointerSmoothing, 0), 1)
         copy.snapRadius = min(max(snapRadius, 4), 40)
+        copy.armSensitivity = min(max(armSensitivity, 0.5), 1.5)
         copy.enabledGestures.insert(.arm)
         copy.enabledGestures.insert(.disarm)
         return copy

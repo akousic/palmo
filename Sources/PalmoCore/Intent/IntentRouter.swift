@@ -88,6 +88,8 @@ public actor IntentRouter {
         case .pointer(let p):
             await moveCursor(p, at: time, dragging: false)
             return nil
+        case .armProgress:
+            return nil
         case .pointerHold(let p):
             mapper.hold(handPoint: p, at: time)
             return nil

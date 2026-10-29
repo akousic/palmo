@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// A snapshot of the engine for the menu and overlay.
 public struct EngineStatus: Sendable, Equatable {
@@ -16,6 +17,10 @@ public struct EngineStatus: Sendable, Equatable {
     public var framesPerSecond: Double = 0
     /// Current Vision frame-rate cap.
     public var targetFrameRate: Double = 30
+    /// Progress `0...1` of an open-palm hold toward arming (0 when none is in progress).
+    public var armProgress: Double = 0
+    /// Why the latest frame didn't count toward arming, while disarmed with a hand in view.
+    public var armRejection: ArmRejection?
 
     /// Creates an empty status.
     public init() {}
@@ -42,6 +47,14 @@ public actor GestureEngine {
     private var lastStatusEmit: TimeInterval = -.infinity
     private var frameTimes: [TimeInterval] = []
     private var lastFrameTime: TimeInterval = 0
+    private var lastLoggedRejection: ArmRejection?
+    private var lastRejectionLog: TimeInterval = -.infinity
+    private var rejectionCounts: [ArmRejection: Int] = [:]
+
+    /// Arming diagnostics. View with:
+    /// `log stream --predicate 'subsystem == "com.kousic.palmo" && category == "arming"' --level debug`
+    /// Only reasons and timing are logged, never images or hand coordinates.
+    static let armLog = Logger(subsystem: "com.kousic.palmo", category: "arming")
 
     /// Creates an engine.
     /// - Parameter setFrameRate: called when the engine wants the capture layer to change its Vision fps cap.
@@ -126,8 +139,14 @@ public actor GestureEngine {
         let context = RecognitionContext(faceRect: frame.face,
                                          secondsSinceKeyboardInput: keyboard.secondsSinceUserKey,
                                          motionPrediction: prediction)
+        let wasArmed = recognizer.isArmed
+        let abandonedBefore = recognizer.lastAbandonedArm.map { "\($0.reason)\($0.progress)" }
         let events = recognizer.process(pose, at: t, context: context)
         await dispatch(events, at: t)
+        logArming(wasArmed: wasArmed, abandonedBefore: abandonedBefore, events: events, at: t)
+        for case .armProgress(let p) in events { current.armProgress = p }
+        if recognizer.isArmed { current.armProgress = 0 }
+        current.armRejection = (recognizer.isArmed || pose == nil) ? nil : recognizer.lastArmRejection
 
         frameTimes.append(t)
         frameTimes.removeAll { t - $0 > 1 }
@@ -164,9 +183,34 @@ public actor GestureEngine {
         statusContinuation.yield(current)
     }
 
-    /// Idle throttling: 30 fps while armed, 15 fps while a hand is around, 6 fps when nobody is gesturing.
+    private func logArming(wasArmed: Bool, abandonedBefore: String?, events: [GestureEvent], at t: TimeInterval) {
+        let log = Self.armLog
+        if !wasArmed && recognizer.isArmed {
+            log.info("Armed by open-palm hold")
+            rejectionCounts.removeAll()
+            lastLoggedRejection = nil
+            return
+        }
+        guard !recognizer.isArmed else { return }
+        if let abandoned = recognizer.lastAbandonedArm, "\(abandoned.reason)\(abandoned.progress)" != abandonedBefore {
+            let counts = rejectionCounts.sorted { $0.value > $1.value }.map { "\($0.key.rawValue)=\($0.value)" }.joined(separator: " ")
+            log.notice("Arm hold lost at \(Int(abandoned.progress * 100), privacy: .public)%: \(abandoned.reason.explanation, privacy: .public). Recent rejections: \(counts, privacy: .public)")
+            rejectionCounts.removeAll()
+        }
+        guard let reason = recognizer.lastArmRejection, reason != .noHand else { return }
+        rejectionCounts[reason, default: 0] += 1
+        // Log a change of reason immediately, otherwise at most every 2 s.
+        if reason != lastLoggedRejection || t - lastRejectionLog > 2 {
+            lastLoggedRejection = reason
+            lastRejectionLog = t
+            log.debug("Arm frame rejected: \(reason.explanation, privacy: .public)")
+        }
+    }
+
+    /// Idle throttling: 30 fps while armed or while a hand is in view (so the arm hold builds quickly),
+    /// 8 fps when nobody is gesturing.
     private func updateFrameRate(at t: TimeInterval) {
-        let target: Double = recognizer.isArmed ? 30 : (t - lastHandTime < 3 ? 15 : 6)
+        let target: Double = recognizer.isArmed ? 30 : (t - lastHandTime < 3 ? 30 : 8)
         if target != current.targetFrameRate {
             current.targetFrameRate = target
             setFrameRate(target)
